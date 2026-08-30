@@ -1,0 +1,6 @@
+user.json
+vendor
+test.php
+.idea
+.phpunit.result.cache
+.php-cs-fixer.cache

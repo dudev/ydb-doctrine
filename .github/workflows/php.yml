@@ -1,0 +1,35 @@
+name: Test
+
+on: push
+
+jobs:
+  phpunit:
+    name: PHPUnit
+    runs-on: ubuntu-latest
+    env:
+      YDB_URL: ydb://ydb:2136/local?discovery=false&amp;iam_config[anonymous]=true&amp;iam_config[insecure]=true
+    strategy:
+      matrix:
+        php: ['8.1']
+    services:
+      ydb:
+        image: cr.yandex/yc/yandex-docker-local-ydb:latest
+        env:
+          YDB_USE_IN_MEMORY_PDISKS: env
+        ports:
+          - 2136
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: curl, mbstring, zip, bcmath, grpc
+          coverage: none
+      - name: Install Composer dependencies
+        run: composer install -o --no-progress
+
+      - name: PHPUnit
+        run: |
+          vendor/bin/phpunit
