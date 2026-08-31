@@ -1,18 +1,22 @@
 <?php
 
-namespace Dimajolkin\YdbDoctrine\ORM\Hack;
+namespace Dudev\YdbDoctrine\ORM\Hack;
 
 class Setter
 {
+    /** @param class-string $parentClassName */
     public function __construct(
         private object $object,
         private string $parentClassName
     ) {
     }
 
-    private function execute(callable $func): mixed
+    private function execute(\Closure $func): mixed
     {
-        return \Closure::bind($func, $this)->bindTo($this->object, $this->parentClassName)();
+        $bound = $func->bindTo($this->object, $this->parentClassName)
+            ?? throw new \Exception("Could not bind closure to scope {$this->parentClassName}");
+
+        return $bound();
     }
 
     public function setValue(string $property, mixed $value): void

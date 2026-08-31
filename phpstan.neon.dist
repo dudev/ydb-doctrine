@@ -1,0 +1,21 @@
+includes:
+    - vendor/phpstan/phpstan-doctrine/extension.neon
+    - vendor/phpstan/phpstan-phpunit/extension.neon
+
+parameters:
+    level: 8
+    paths:
+        - src/
+        - tests/
+
+    excludePaths:
+        - tests/bootstrap.php
+
+    ignoreErrors:
+        # ydb-platform/ydb-php-sdk's TypeValueHelpersTrait::typeValue() docblock says
+        # "@param null $type" but the method actually accepts type-name strings
+        # ('UTF8', 'INT32', ...) - verified against a live YDB instance. Upstream
+        # docblock bug, not something fixable from this package.
+        -
+            message: '~Parameter #2 \$type of method Dudev\\YdbDoctrine\\YdbStatement::typeValue\(\) expects null, string given\.~'
+            path: src/YdbStatement.php

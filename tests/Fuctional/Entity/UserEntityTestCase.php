@@ -1,9 +1,9 @@
 <?php
 
-namespace Dimajolkin\YdbDoctrine\Tests\Fuctional\Entity;
+namespace Dudev\YdbDoctrine\Tests\Fuctional\Entity;
 
-use Dimajolkin\YdbDoctrine\Tests\App\Entity\User;
-use Dimajolkin\YdbDoctrine\Tests\Fuctional\AbstractFunctionalCase;
+use Dudev\YdbDoctrine\Tests\App\Entity\User;
+use Dudev\YdbDoctrine\Tests\Fuctional\AbstractFunctionalCase;
 
 class UserEntityTestCase extends AbstractFunctionalCase
 {

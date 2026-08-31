@@ -7,7 +7,16 @@
   </coverage>
   <testsuites>
     <testsuite name="tests">
-      <directory>./tests/</directory>
+      <!--
+        Two suffixes because the codebase mixes both conventions: unit tests are
+        named *Test.php, functional (live-YDB) tests are named *TestCase.php.
+        A bare <directory> defaults to matching only *Test.php, which silently
+        skipped every functional test (Fuctional/*TestCase.php); confirmed via
+        the list tests option showing zero of them despite a plain run reporting
+        a clean pass.
+      -->
+      <directory suffix="Test.php">./tests/</directory>
+      <directory suffix="TestCase.php">./tests/</directory>
     </testsuite>
   </testsuites>
   <php>

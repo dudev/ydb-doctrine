@@ -1,6 +1,6 @@
 <?php
 
-namespace Dimajolkin\YdbDoctrine;
+namespace Dudev\YdbDoctrine;
 
 use Doctrine\DBAL\Types\Type;
 use Doctrine\DBAL\Types\Types;

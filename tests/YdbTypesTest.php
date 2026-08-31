@@ -1,8 +1,8 @@
 <?php
 
-namespace Dimajolkin\YdbDoctrine\Tests;
+namespace Dudev\YdbDoctrine\Tests;
 
-use Dimajolkin\YdbDoctrine\YdbTypes;
+use Dudev\YdbDoctrine\YdbTypes;
 use PHPUnit\Framework\TestCase;
 use YdbPlatform\Ydb\Traits\TypeValueHelpersTrait;
 
@@ -10,6 +10,7 @@ class YdbTypesTest extends TestCase
 {
     use TypeValueHelpersTrait;
 
+    /** @return list<array{0: string, 1: mixed}> */
     public function providerConsts(): array
     {
         return [
@@ -43,6 +44,10 @@ class YdbTypesTest extends TestCase
     public function testConst(string $const, mixed $value): void
     {
         $typeObject = $this->valueOfType($value, $const);
+        // getType() isn't declared on TypeContract, only on the concrete classes
+        // TypeValueHelpersTrait::valueOfType() actually returns - an SDK
+        // interface/implementation gap, not something fixable from here.
+        // @phpstan-ignore method.notFound
         $this->assertEquals(strtolower($typeObject->getType()), $const);
     }
 }

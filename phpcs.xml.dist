@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+<ruleset name="Project">
+    <description>PHP CodeSniffer configuration</description>
+    <arg name="extensions" value="php"/>
+    <arg value="sp"/>
+    <file>src</file>
+    <file>tests</file>
+    <rule ref="PSR12"/>
+
+    <!-- Тесты в основном сравнивают сгенерированные YQL/DQL и URL одной строкой —
+         перенос по 120 символам ломает assert на несколько строк без всякой пользы. -->
+    <rule ref="Generic.Files.LineLength">
+        <exclude-pattern>tests/*</exclude-pattern>
+    </rule>
+</ruleset>

@@ -1,33 +1,24 @@
 <?php
 
-namespace Dimajolkin\YdbDoctrine\Driver;
+namespace Dudev\YdbDoctrine\Driver;
 
-use Dimajolkin\YdbDoctrine\SchemaManager\YdbSchemaManager;
-use Dimajolkin\YdbDoctrine\Type\DateTimeType;
-use Dimajolkin\YdbDoctrine\Type\DateTimeTzType;
-use Dimajolkin\YdbDoctrine\Type\DecimalType;
-use Dimajolkin\YdbDoctrine\Type\FloatType;
-use Dimajolkin\YdbDoctrine\Type\JsonType;
-use Dimajolkin\YdbDoctrine\YdbPlatform;
-use Doctrine\DBAL\Connection;
+use Dudev\YdbDoctrine\Type\DateTimeType;
+use Dudev\YdbDoctrine\Type\DateTimeTzType;
+use Dudev\YdbDoctrine\Type\DecimalType;
+use Dudev\YdbDoctrine\Type\FloatType;
+use Dudev\YdbDoctrine\Type\JsonType;
+use Dudev\YdbDoctrine\YdbPlatform;
 use Doctrine\DBAL\Driver;
 use Doctrine\DBAL\Driver\API\ExceptionConverter;
 use Doctrine\DBAL\Driver\Connection as DriverConnection;
 use Doctrine\DBAL\Platforms\AbstractPlatform;
-use Doctrine\DBAL\Schema\AbstractSchemaManager;
+use Doctrine\DBAL\ServerVersionProvider;
 use Doctrine\DBAL\Types\Type;
 use Doctrine\DBAL\Types\Types;
 use Psr\Log\LoggerInterface;
-use YdbPlatform\Ydb\Ydb;
-
-/**
- * Версия файла без final атрибота и с другим классом Parser.
- */
-include_once __DIR__.'/../../doctrine/Query.php';
 
 class YdbDriver implements Driver
 {
-    private ?Ydb $ydb = null;
     private ?LoggerInterface $logger = null;
 
     public function __construct(LoggerInterface $logger = null)
@@ -35,14 +26,16 @@ class YdbDriver implements Driver
         $this->logger = $logger;
     }
 
+    /**
+     * @param array{url?: string, driverOptions?: array{url?: string}} $params 'url' is
+     *        this driver's own connection-string convention, not a standard DBAL param.
+     */
     public function connect(array $params): DriverConnection
     {
         $dbUri = $params['url'] ?? $params['driverOptions']['url'] ?? throw new \Exception();
         $this->overrideBaseTypes();
-        $connect = YdbConnection::makeConnectionByUrl($dbUri, $this->logger);
-        $this->ydb = $connect->getYdb();
 
-        return $connect;
+        return YdbConnection::makeConnectionByUrl($dbUri, $this->logger);
     }
 
     public function setLogger(?LoggerInterface $logger): void
@@ -59,18 +52,13 @@ class YdbDriver implements Driver
         Type::overrideType(Types::DECIMAL, DecimalType::class);
     }
 
-    public function getDatabasePlatform(): AbstractPlatform
+    public function getDatabasePlatform(ServerVersionProvider $versionProvider): AbstractPlatform
     {
         return new YdbPlatform();
     }
 
-    public function getSchemaManager(Connection $conn, AbstractPlatform $platform): AbstractSchemaManager
-    {
-        return new YdbSchemaManager($conn, $platform, $this->ydb);
-    }
-
     public function getExceptionConverter(): ExceptionConverter
     {
-        // TODO: Implement getExceptionConverter() method.
+        return new YdbExceptionConverter();
     }
 }

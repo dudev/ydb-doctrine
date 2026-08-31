@@ -1,8 +1,8 @@
 <?php
 
-namespace Dimajolkin\YdbDoctrine\Tests\Unit\Connect;
+namespace Dudev\YdbDoctrine\Tests\Unit\Connect;
 
-use Dimajolkin\YdbDoctrine\Parser\YdbUriParser;
+use Dudev\YdbDoctrine\Parser\YdbUriParser;
 use PHPUnit\Framework\TestCase;
 
 class EnvParserTest extends TestCase

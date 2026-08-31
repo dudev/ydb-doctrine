@@ -1,13 +1,15 @@
 <?php
 
-namespace Dimajolkin\YdbDoctrine\ORM\Query;
+namespace Dudev\YdbDoctrine\ORM\Query;
 
-use Dimajolkin\YdbDoctrine\ORM\Functions\Expression\RandExpression;
-use Dimajolkin\YdbDoctrine\ORM\Hack\Setter;
+use Dudev\YdbDoctrine\ORM\Functions\Expression\RandExpression;
+use Dudev\YdbDoctrine\ORM\Hack\Setter;
+use Doctrine\ORM\Query;
 use Doctrine\ORM\Query\AST;
 use Doctrine\ORM\Query\AST\OrderByItem;
 use Doctrine\ORM\Query\AST\PathExpression;
 use Doctrine\ORM\Query\AST\Subselect;
+use Doctrine\ORM\Query\ParserResult;
 use Doctrine\ORM\Query\ResultSetMapping;
 use Doctrine\ORM\Query\SqlWalker;
 
@@ -16,14 +18,18 @@ class YdbWalker extends SqlWalker
     private ResultSetMapping $resultSetMapping;
     private Setter $setter;
 
-    public function __construct($query, $parserResult, array $queryComponents)
+    /**
+     * @param Query<mixed, mixed>   $query
+     * @param array<string, mixed>  $queryComponents
+     */
+    public function __construct(Query $query, ParserResult $parserResult, array $queryComponents)
     {
         $this->resultSetMapping = $parserResult->getResultSetMapping();
         $this->setter = new Setter($this, SqlWalker::class);
         parent::__construct($query, $parserResult, $queryComponents);
     }
 
-    private function getAliasByColumn(string $tableAlias, string $columnName): ?string
+    private function getAliasByColumn(string $tableAlias, ?string $columnName): ?string
     {
         foreach ($this->resultSetMapping->fieldMappings as $fieldAlias => $fieldName) {
             if ($fieldName === $columnName) {
@@ -47,17 +53,13 @@ class YdbWalker extends SqlWalker
             throw new \Exception();
         }
 
-        return 'RANDOM('.$field.')';
+        return 'RANDOM(' . $field . ')';
     }
 
     /**
      * Walks down an OrderByItem AST node, thereby generating the appropriate SQL.
-     *
-     * @param OrderByItem $orderByItem
-     *
-     * @return string
      */
-    public function walkOrderByItem($orderByItem)
+    public function walkOrderByItem(OrderByItem $orderByItem): string
     {
         $type = strtoupper($orderByItem->type);
         $expr = $orderByItem->expression;
@@ -72,7 +74,7 @@ class YdbWalker extends SqlWalker
                 $sql = $expr->dispatch($this);
             }
         } else {
-            $sql = $this->walkResultVariable($this->getQueryComponents()[$expr]['token']['value']);
+            $sql = $this->walkResultVariable((string) $this->getQueryComponents()[$expr]['token']->value);
         }
 
         //        $this->orderedColumnsMap[$sql] = $type;
@@ -81,9 +83,9 @@ class YdbWalker extends SqlWalker
         $this->setter->setValue('orderedColumnsMap', $map);
 
         if ($expr instanceof Subselect) {
-            return '('.$sql.') '.$type;
+            return '(' . $sql . ') ' . $type;
         }
 
-        return $sql.' '.$type;
+        return $sql . ' ' . $type;
     }
 }

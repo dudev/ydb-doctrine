@@ -1,9 +1,9 @@
 <?php
 
-namespace Dimajolkin\YdbDoctrine\Tests\Unit\ORM;
+namespace Dudev\YdbDoctrine\Tests\Unit\ORM;
 
-use Dimajolkin\YdbDoctrine\Tests\App\Entity\User;
-use Dimajolkin\YdbDoctrine\Tests\Helpers\EntityManagerFactoryTrait;
+use Dudev\YdbDoctrine\Tests\App\Entity\User;
+use Dudev\YdbDoctrine\Tests\Helpers\EntityManagerFactoryTrait;
 use Doctrine\ORM\EntityRepository;
 use PHPUnit\Framework\TestCase;
 
@@ -16,6 +16,6 @@ class EntityRepositoryTest extends TestCase
         $em = $this->makeEntityManager();
         $repository = new EntityRepository($em, $em->getClassMetadata(User::class));
         $res = $repository->find(1);
-        $this->assertTrue(true);
+        $this->assertNull($res);
     }
 }

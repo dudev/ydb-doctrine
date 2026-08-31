@@ -1,27 +1,22 @@
 <?php
 
-namespace Dimajolkin\YdbDoctrine;
+namespace Dudev\YdbDoctrine;
 
 use Doctrine\DBAL\Driver\Result;
 
 class YdbSchemaResult implements Result
 {
-    public function __construct(
-        private bool $status,
-    ) {
-    }
-
-    public function fetchNumeric()
-    {
-        return 1;
-    }
-
-    public function fetchAssociative()
+    public function fetchNumeric(): array|false
     {
         return false;
     }
 
-    public function fetchOne()
+    public function fetchAssociative(): array|false
+    {
+        return false;
+    }
+
+    public function fetchOne(): mixed
     {
         return false;
     }

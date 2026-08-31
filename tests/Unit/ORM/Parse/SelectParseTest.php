@@ -1,8 +1,8 @@
 <?php
 
-namespace Dimajolkin\YdbDoctrine\Tests\Unit\ORM\Parse;
+namespace Dudev\YdbDoctrine\Tests\Unit\ORM\Parse;
 
-use Dimajolkin\YdbDoctrine\Tests\App\Entity\SimpleEntity;
+use Dudev\YdbDoctrine\Tests\App\Entity\SimpleEntity;
 
 class SelectParseTest extends AbstractParse
 {
@@ -12,7 +12,7 @@ class SelectParseTest extends AbstractParse
         $qb = $em->createQueryBuilder();
         $qb->select('u')->from(SimpleEntity::class, 'u')->andWhere($qb->expr()->eq('u.id', 1));
 
-        $this->assertEquals('SELECT u FROM Dimajolkin\YdbDoctrine\Tests\App\Entity\SimpleEntity u WHERE u.id = 1', $qb->getDQL());
+        $this->assertEquals('SELECT u FROM Dudev\YdbDoctrine\Tests\App\Entity\SimpleEntity u WHERE u.id = 1', $qb->getDQL());
         $this->assertEquals('SELECT s0_.id AS id_0 FROM simple_entity s0_ WHERE s0_.id = 1', $qb->getQuery()->getSQL());
     }
 
@@ -22,7 +22,7 @@ class SelectParseTest extends AbstractParse
         $qb = $em->createQueryBuilder();
         $qb->select('u')->from(SimpleEntity::class, 'u')->orderBy('u.id', 'ASC');
 
-        $this->assertEquals('SELECT u FROM Dimajolkin\YdbDoctrine\Tests\App\Entity\SimpleEntity u ORDER BY u.id ASC', $qb->getDQL());
+        $this->assertEquals('SELECT u FROM Dudev\YdbDoctrine\Tests\App\Entity\SimpleEntity u ORDER BY u.id ASC', $qb->getDQL());
         $this->assertEquals('SELECT s0_.id AS id_0 FROM simple_entity s0_ ORDER BY id_0 ASC', $qb->getQuery()->getSQL());
     }
 
@@ -37,14 +37,14 @@ class SelectParseTest extends AbstractParse
             ->orderBy('u.id')
             ->setMaxResults(20);
 
-        $this->assertEquals('SELECT DISTINCT u, u.id FROM Dimajolkin\YdbDoctrine\Tests\App\Entity\SimpleEntity u ORDER BY u.id ASC', $qb->getDQL());
+        $this->assertEquals('SELECT DISTINCT u, u.id FROM Dudev\YdbDoctrine\Tests\App\Entity\SimpleEntity u ORDER BY u.id ASC', $qb->getDQL());
         $this->assertEquals('SELECT DISTINCT s0_.id AS id_0, s0_.id AS id_1 FROM simple_entity s0_ ORDER BY id_0 ASC LIMIT 20', $qb->getQuery()->getSQL());
     }
 
     public function testParseDQL(): void
     {
         $em = $this->makeEntityManager();
-        $query = $em->createQuery('SELECT entity FROM Dimajolkin\YdbDoctrine\Tests\App\Entity\SimpleEntity entity ORDER BY entity.id DESC');
+        $query = $em->createQuery('SELECT entity FROM Dudev\YdbDoctrine\Tests\App\Entity\SimpleEntity entity ORDER BY entity.id DESC');
         $this->assertEquals('SELECT s0_.id AS id_0 FROM simple_entity s0_ ORDER BY id_0 DESC', $query->getSQL());
 
         $cloneQuery = clone $query;

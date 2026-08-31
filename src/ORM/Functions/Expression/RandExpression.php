@@ -1,9 +1,10 @@
 <?php
 
-namespace Dimajolkin\YdbDoctrine\ORM\Functions\Expression;
+namespace Dudev\YdbDoctrine\ORM\Functions\Expression;
 
-use Dimajolkin\YdbDoctrine\ORM\Query\YdbWalker;
+use Dudev\YdbDoctrine\ORM\Query\YdbWalker;
 use Doctrine\ORM\Query\AST\Node;
+use Doctrine\ORM\Query\SqlWalker;
 
 class RandExpression extends Node
 {
@@ -23,7 +24,7 @@ class RandExpression extends Node
         return $this->columnName;
     }
 
-    public function dispatch($walker): string
+    public function dispatch(SqlWalker $walker): string
     {
         if (!$walker instanceof YdbWalker) {
             throw new \Exception();

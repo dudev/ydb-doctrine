@@ -1,9 +1,8 @@
 <?php
 
-namespace Dimajolkin\YdbDoctrine\Tests\Unit\YdbDoctrine;
+namespace Dudev\YdbDoctrine\Tests\Unit\YdbDoctrine;
 
-use Dimajolkin\YdbDoctrine\Driver\YdbConnection;
-use Dimajolkin\YdbDoctrine\YdbStatement;
+use Dudev\YdbDoctrine\YdbStatement;
 use Doctrine\DBAL\ParameterType;
 use PHPUnit\Framework\TestCase;
 use YdbPlatform\Ydb\Session;
@@ -26,8 +25,7 @@ class YdbStatementTest extends TestCase
     public function testString(): void
     {
         $ydb = $this->makeYdb();
-        $connect = new YdbConnection($ydb);
-        $statement = new YdbStatement($connect, 'INSERT INTO my_table (name) VALUES (?)', $ydb->table());
+        $statement = new YdbStatement('INSERT INTO my_table (name) VALUES (?)', $ydb->table());
         $statement->bindValue(1, 'name\test2');
         $this->assertEquals("DECLARE \$col1 AS UTF8;\nINSERT INTO my_table (name) VALUES (\$col1)", $statement->getRawSql());
     }
@@ -36,9 +34,7 @@ class YdbStatementTest extends TestCase
     {
         $ydb = $this->makeYdb();
 
-        $connect = new YdbConnection($ydb);
         $statement = new YdbStatement(
-            $connect,
             'INSERT INTO doctrine_migration_versions (version, executed_at, execution_time) VALUES (?, ?, ?)',
             $ydb->table(),
         );

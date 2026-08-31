@@ -1,13 +1,12 @@
 <?php
 
-namespace Dimajolkin\YdbDoctrine\Driver;
+namespace Dudev\YdbDoctrine\Driver;
 
-use Dimajolkin\YdbDoctrine\Parser\YdbUriParser;
-use Dimajolkin\YdbDoctrine\YdbStatement;
+use Dudev\YdbDoctrine\Parser\YdbUriParser;
+use Dudev\YdbDoctrine\YdbStatement;
 use Doctrine\DBAL\Driver\Connection;
 use Doctrine\DBAL\Driver\Result;
 use Doctrine\DBAL\Driver\Statement;
-use Doctrine\DBAL\ParameterType;
 use Psr\Log\LoggerInterface;
 use YdbPlatform\Ydb\Table;
 use YdbPlatform\Ydb\Ydb;
@@ -43,7 +42,7 @@ final class YdbConnection implements Connection
 
     public function prepare(string $sql): Statement
     {
-        return new YdbStatement($this, $sql, $this->table);
+        return new YdbStatement($sql, $this->table);
     }
 
     public function query(string $sql): Result
@@ -51,56 +50,43 @@ final class YdbConnection implements Connection
         return $this->prepare($sql)->execute();
     }
 
-    public function quote($value, $type = ParameterType::STRING)
+    public function quote(string $value): string
     {
-        if (ParameterType::STRING === $type) {
-            $value = \addslashes(\addslashes($value));
+        $value = \addslashes(\addslashes($value));
 
-            return "'$value'";
-        }
-
-        if (ParameterType::BOOLEAN === $type) {
-            return $type ? 'true' : 'false';
-        }
-
-        return $value;
+        return "'$value'";
     }
 
-    public function exec(string $sql): int
+    public function exec(string $sql): int|string
     {
         return $this->query($sql)->rowCount();
     }
 
-    public function lastInsertId($name = null)
+    public function lastInsertId(): int|string
     {
         throw new \Exception();
     }
 
-    public function beginTransaction(): bool
+    public function beginTransaction(): void
     {
-        try {
-            $this->table->session()?->beginTransaction();
-
-            return true;
-        } catch (\Exception) {
-            return false;
-        }
+        $this->table->session()->beginTransaction();
     }
 
-    public function commit(): bool
+    public function commit(): void
     {
-        $this->table->session()?->commit();
-
-        return true;
+        $this->table->session()->commit();
     }
 
-    public function rollBack(): bool
+    public function rollBack(): void
     {
         try {
-            $this->table->session()?->rollBack();
+            $this->table->session()->rollBack();
         } catch (\Throwable) {
         }
+    }
 
-        return true;
+    public function getNativeConnection(): Ydb
+    {
+        return $this->ydb;
     }
 }

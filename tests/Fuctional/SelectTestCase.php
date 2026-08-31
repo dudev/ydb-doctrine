@@ -1,6 +1,6 @@
 <?php
 
-namespace Dimajolkin\YdbDoctrine\Tests\Fuctional;
+namespace Dudev\YdbDoctrine\Tests\Fuctional;
 
 final class SelectTestCase extends AbstractFunctionalCase
 {
