@@ -1,13 +1,19 @@
 <?php
 
-namespace Dimajolkin\YdbDoctrine\Type;
+namespace Dudev\YdbDoctrine\Type;
 
-use Dimajolkin\YdbDoctrine\ParameterType;
+use Dudev\YdbDoctrine\Value\TypedValue;
+use Dudev\YdbDoctrine\YdbTypes;
+use Doctrine\DBAL\Platforms\AbstractPlatform;
 
 class FloatType extends \Doctrine\DBAL\Types\FloatType
 {
-    public function getBindingType(): int
+    public function convertToDatabaseValue(mixed $value, AbstractPlatform $platform): mixed
     {
-        return ParameterType::FLOAT;
+        if (null === $value) {
+            return $value;
+        }
+
+        return new TypedValue((float) $value, YdbTypes::FLOAT);
     }
 }

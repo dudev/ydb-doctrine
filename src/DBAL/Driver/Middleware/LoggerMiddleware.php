@@ -1,8 +1,8 @@
 <?php
 
-namespace Dimajolkin\YdbDoctrine\DBAL\Driver\Middleware;
+namespace Dudev\YdbDoctrine\DBAL\Driver\Middleware;
 
-use Dimajolkin\YdbDoctrine\Driver\YdbDriver;
+use Dudev\YdbDoctrine\Driver\YdbDriver;
 use Doctrine\DBAL\Driver;
 use Doctrine\DBAL\Driver\Middleware;
 use Psr\Log\LoggerInterface;

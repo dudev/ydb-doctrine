@@ -1,9 +1,38 @@
-version: '3.8'
-
 services:
   db:
     image: cr.yandex/yc/yandex-docker-local-ydb:latest
+    environment:
+      YDB_USE_IN_MEMORY_PDISKS: 'true'
+      YDB_LOCAL_SURVIVE_RESTART: 'true'
+      YDB_GRPC_ENABLE_TLS: 'true'
+      GRPC_TLS_PORT: '2135'
+      GRPC_PORT: '2136'
+      YDB_GRPC_TLS_DATA_PATH: /ydb_certs
     ports:
       - 8765:8765
       - 2136:2136
       - 48066:48066
+    # Same as the image's own /initialize_local_ydb entrypoint script, with
+    # --enable-feature-flag enable_views added - views are compiled in but off
+    # by default on this image, and there's no config-file mount point to flip
+    # it another way.
+    command: >
+      sh -c "
+        /local_ydb deploy --ydb-working-dir /ydb_data --ydb-binary-path /ydbd --fixed-ports --dont-use-log-files --enable-feature-flag enable_views;
+        if [ -f /init_ydb ]; then sh /init_ydb; fi;
+        tail -f /dev/null
+      "
+
+  php:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+    working_dir: /app
+    volumes:
+      - .:/app
+    # phpunit.xml forces YDB_URL to localhost:2136 (it expects to run on the host,
+    # next to a port-mapped `db` container, per the GitHub Actions job). Sharing
+    # db's network namespace makes that same URL resolve correctly in Docker too.
+    network_mode: service:db
+    depends_on:
+      - db

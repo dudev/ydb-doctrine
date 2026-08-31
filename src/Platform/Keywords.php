@@ -1,17 +1,12 @@
 <?php
 
-namespace Dimajolkin\YdbDoctrine\Platform;
+namespace Dudev\YdbDoctrine\Platform;
 
 use Doctrine\DBAL\Platforms\Keywords\KeywordList;
 
 class Keywords extends KeywordList
 {
-    public function getName()
-    {
-        return 'ydb';
-    }
-
-    protected function getKeywords()
+    protected function getKeywords(): array
     {
         return [
             'ALL',

@@ -1,6 +1,6 @@
 <?php
 
-namespace Dimajolkin\YdbDoctrine;
+namespace Dudev\YdbDoctrine;
 
 use Doctrine\DBAL\Cache\ArrayResult;
 use Doctrine\DBAL\Driver\Result;
@@ -13,10 +13,12 @@ class YdbResult implements Result
     public function __construct(
         private QueryResult $queryResult
     ) {
-        $this->result = new ArrayResult($this->queryResult->rows());
+        $columnNames = array_column($this->queryResult->columns(), 'name');
+        $rows = array_values(array_map('array_values', $this->queryResult->rows()));
+        $this->result = new ArrayResult($columnNames, $rows);
     }
 
-    public function fetchNumeric()
+    public function fetchNumeric(): array|false
     {
         return $this->result->fetchNumeric();
     }

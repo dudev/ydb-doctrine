@@ -1,13 +1,19 @@
 <?php
 
-namespace Dimajolkin\YdbDoctrine\Type;
+namespace Dudev\YdbDoctrine\Type;
 
-use Dimajolkin\YdbDoctrine\ParameterType;
+use Dudev\YdbDoctrine\Value\TypedValue;
+use Dudev\YdbDoctrine\YdbTypes;
+use Doctrine\DBAL\Platforms\AbstractPlatform;
 
 class DecimalType extends \Doctrine\DBAL\Types\DecimalType
 {
-    public function getBindingType(): int
+    public function convertToDatabaseValue(mixed $value, AbstractPlatform $platform): mixed
     {
-        return ParameterType::DECIMAL;
+        if (null === $value) {
+            return $value;
+        }
+
+        return new TypedValue((string) $value, YdbTypes::DECIMAL);
     }
 }

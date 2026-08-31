@@ -1,10 +1,12 @@
 <?php
 
-namespace Dimajolkin\YdbDoctrine\Type;
+namespace Dudev\YdbDoctrine\Type;
 
-use Dimajolkin\YdbDoctrine\ParameterType;
+use Dudev\YdbDoctrine\Value\TypedValue;
+use Dudev\YdbDoctrine\YdbTypes;
 use Doctrine\DBAL\Platforms\AbstractPlatform;
-use Doctrine\DBAL\Types\ConversionException;
+use Doctrine\DBAL\Types\Exception\InvalidFormat;
+use Doctrine\DBAL\Types\Exception\InvalidType;
 use Doctrine\DBAL\Types\Type;
 use Doctrine\DBAL\Types\Types;
 
@@ -20,16 +22,6 @@ class DateTimeTzType extends Type
         return $platform->getDateTimeTypeDeclarationSQL($column);
     }
 
-    public function canRequireSQLConversion(): bool
-    {
-        return true;
-    }
-
-    public function convertToDatabaseValueSQL($sqlExpr, AbstractPlatform $platform): string
-    {
-        return "CAST($sqlExpr as Datetime)";
-    }
-
     public function convertToDatabaseValue(mixed $value, AbstractPlatform $platform): mixed
     {
         if (null === $value) {
@@ -37,15 +29,10 @@ class DateTimeTzType extends Type
         }
 
         if ($value instanceof \DateTimeInterface) {
-            return $value;
+            return new TypedValue($value, YdbTypes::DATETIME);
         }
 
-        throw ConversionException::conversionFailedInvalidType($value, $this->getName(), ['null', 'DateTime']);
-    }
-
-    public function getBindingType(): int
-    {
-        return ParameterType::DATETIME;
+        throw InvalidType::new($value, $this->getName(), ['null', 'DateTime']);
     }
 
     public function convertToPHPValue(mixed $value, AbstractPlatform $platform): mixed
@@ -61,7 +48,11 @@ class DateTimeTzType extends Type
         }
 
         if (false === $val) {
-            throw ConversionException::conversionFailedFormat($value, $this->getName(), $platform->getDateTimeFormatString());
+            throw InvalidFormat::new(
+                $value,
+                $this->getName(),
+                $platform->getDateTimeFormatString(),
+            );
         }
 
         return $val;

@@ -1,18 +1,17 @@
 <?php
 
-namespace Dimajolkin\YdbDoctrine\Tests\App\Doctrine;
+namespace Dudev\YdbDoctrine\Tests\App\Doctrine;
 
 use Doctrine\Persistence\AbstractManagerRegistry;
 
 class ManagerRegistry extends AbstractManagerRegistry
 {
-    protected function getService(string $name)
+    protected function getService(string $name): object
     {
-        // TODO: Implement getService() method.
+        throw new \Exception('ManagerRegistry::getService not implemented');
     }
 
-    protected function resetService(string $name)
+    protected function resetService(string $name): void
     {
-        // TODO: Implement resetService() method.
     }
 }

@@ -1,9 +1,9 @@
 ## Demo
 
-[![Test](https://github.com/dimajolkin/ydb-doctrine/actions/workflows/php.yml/badge.svg?branch=master)](https://github.com/dimajolkin/ydb-doctrine/actions/workflows/php.yml)
+[![Test](https://github.com/dudev/ydb-doctrine/actions/workflows/php.yml/badge.svg?branch=master)](https://github.com/dudev/ydb-doctrine/actions/workflows/php.yml)
 
 ```bash
-    composer require dimajolkin/ydb-doctrine:dev-master
+    composer require dudev/ydb-doctrine:dev-master
 ```
 
 Пишется для проверки возможности запуска в маленьком проекте 
@@ -20,22 +20,22 @@ Example for Symfony:
 
 ```yaml
 parameters:
-  doctrine.orm.entity_manager.class: Dimajolkin\YdbDoctrine\ORM\EntityManager
+  doctrine.orm.entity_manager.class: Dudev\YdbDoctrine\ORM\EntityManager
 
 #services:
 #  doctrine.dbal.logging_middleware:
-#    class: 'Dimajolkin\YdbDoctrine\DBAL\Driver\Middleware\LoggerMiddleware'
+#    class: 'Dudev\YdbDoctrine\DBAL\Driver\Middleware\LoggerMiddleware'
 
 doctrine:
     dbal:
         options:
             YBD_URL: '%env(resolve:DATABASE_URL)%'
-        driver_class: Dimajolkin\YdbDoctrine\Driver\YdbDriver
-        wrapper_class: Dimajolkin\YdbDoctrine\YdbConnection
+        driver_class: Dudev\YdbDoctrine\Driver\YdbDriver
+        wrapper_class: Dudev\YdbDoctrine\YdbConnection
         server_version: 1.4
     dql:
       string_functions:
-        rand: Dimajolkin\YdbDoctrine\ORM\Functions\Rand
+        rand: Dudev\YdbDoctrine\ORM\Functions\Rand
 ```
 
 
@@ -95,7 +95,7 @@ DBAL Type mapping to YDB:
 
 YDB Type:
 
-| Dimajolkin\YdbDoctrine\YdbTypes | Constant Value  | Description |
+| Dudev\YdbDoctrine\YdbTypes | Constant Value  | Description |
 |---------------------------------|-----------------|-------------|
 | BOOL                            | bool            |             |
 | INT8                            | int8            |             |
