@@ -104,6 +104,13 @@ class YdbSchemaManager extends AbstractSchemaManager
      * and rethrown with an explanation instead of a raw gRPC exception - views created
      * via plain SQL are unaffected, only this introspection path is blocked.
      *
+     * View::describeView() itself only exists on the dudev/ydb-php-sdk fork, not yet
+     * on the officially published ydb-platform/ydb-php-sdk that composer.json
+     * declares as this package's dependency (a public package can't require a git
+     * fork - see the discussion that led here). So on a stock install, $ydb->view()
+     * is simply undefined - guarded below with the same "views without SQL access
+     * are unaffected" framing as the UNIMPLEMENTED case above.
+     *
      * @return list<View>
      */
     public function listViews(): array
@@ -112,6 +119,21 @@ class YdbSchemaManager extends AbstractSchemaManager
         foreach ($this->ydb->scheme()->listDirectory() as $entry) {
             if ('VIEW' !== $entry['type']) {
                 continue;
+            }
+
+            // phpstan sees Ydb::view() as always present because this package's dev
+            // vendor/ is locally patched with the dudev/ydb-php-sdk fork (see the
+            // docblock above) - but composer.json declares the real upstream SDK,
+            // which doesn't have it, so this check is genuinely reachable for users.
+            // @phpstan-ignore function.alreadyNarrowedType
+            if (!method_exists($this->ydb, 'view')) {
+                throw new \Exception(
+                    "Cannot list view '{$entry['name']}': the installed ydb-platform/ydb-php-sdk " .
+                    'has no View::describeView() support (added in the dudev/ydb-php-sdk fork, not ' .
+                    'yet released upstream - see YdbSchemaManager::listViews() for details). The ' .
+                    'view itself still works fine via plain SQL - only introspection through ' .
+                    'Doctrine requires that SDK capability.',
+                );
             }
 
             try {
