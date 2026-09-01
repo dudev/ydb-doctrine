@@ -118,20 +118,28 @@ final class YdbPlatform extends AbstractPlatform
      * defaults to sync). Doctrine ORM emits an index like this automatically for
      * every ManyToOne/JoinColumn (the FK column gets one for query performance,
      * even without any DB-level FK constraint - see getCreateTablesSQL() above).
-     * UNIQUE indexes aren't part of YDB's documented index grammar at all, so
-     * rather than silently emit a UNIQUE clause YDB would either reject or
-     * (worse) silently not enforce, that case throws.
+     *
+     * UNIQUE indexes are undocumented (absent from every official syntax/CLI
+     * reference checked), but confirmed live to actually exist and actually
+     * enforce uniqueness - with a sharp edge that took three separate live
+     * checks to pin down: "GLOBAL UNIQUE ON (...)" (bare, no explicit sync
+     * mode) parses fine and silently does NOT enforce anything - both INSERT
+     * and UPSERT happily write a duplicate. Only with SYNC spelled out
+     * explicitly - "GLOBAL UNIQUE SYNC ON (...)" - does a genuinely
+     * conflicting write actually fail (PRECONDITION_FAILED "Conflict with
+     * existing key"), for both INSERT and UPSERT alike. This is the opposite
+     * of plain (non-unique) indexes, where omitting SYNC/ASYNC is confirmed
+     * to default to sync-equivalent behavior - so SYNC must always be emitted
+     * explicitly here, never omitted. UNIQUE combined with ASYNC is separately
+     * rejected server-side outright ("unique: alternative is not implemented
+     * yet: global_index"), which is moot as long as this platform only ever
+     * emits SYNC for unique indexes.
      */
     public function getIndexDeclarationSQL(Index $index): string
     {
-        if ($index->isUnique()) {
-            throw new \Exception(
-                'YdbPlatform::getIndexDeclarationSQL: YDB has no documented UNIQUE secondary ' .
-                "index support, refusing to silently emit one for index '{$index->getName()}'.",
-            );
-        }
+        $unique = $index->isUnique() ? 'UNIQUE SYNC ' : '';
 
-        return 'INDEX ' . $index->getQuotedName($this) . ' GLOBAL ON (' .
+        return 'INDEX ' . $index->getQuotedName($this) . ' GLOBAL ' . $unique . 'ON (' .
             implode(', ', $index->getQuotedColumns($this)) . ')';
     }
 

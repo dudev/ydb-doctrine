@@ -24,6 +24,11 @@ class Post
     #[JoinColumn(name: 'author_id', referencedColumnName: 'id', nullable: false)]
     public User $author;
 
+    /** Optional association, used to pin that a null to-one field is left alone entirely. */
+    #[ManyToOne(targetEntity: User::class)]
+    #[JoinColumn(name: 'reviewer_id', referencedColumnName: 'id', nullable: true)]
+    public ?User $reviewer = null;
+
     public function __construct(int $id, string $title, User $author)
     {
         $this->id = $id;

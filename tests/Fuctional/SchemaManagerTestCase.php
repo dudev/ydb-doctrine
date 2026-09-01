@@ -95,4 +95,77 @@ class SchemaManagerTestCase extends AbstractFunctionalCase
             $sm->dropTable('tmp_view_source');
         }
     }
+
+    /**
+     * UNIQUE indexes are absent from every official YDB syntax/CLI reference
+     * checked, but confirmed live to actually work - with a sharp edge: bare
+     * "INDEX <name> GLOBAL UNIQUE ON (<columns>)" parses fine but silently
+     * enforces nothing at all (a genuine duplicate is written without error);
+     * only "GLOBAL UNIQUE SYNC ON (...)" (explicit SYNC) actually rejects a
+     * conflicting write, for INSERT and UPSERT alike - see
+     * YdbPlatform::getIndexDeclarationSQL(). Pins that a real conflicting
+     * insert, not just the CREATE TABLE statement, is genuinely rejected.
+     *
+     * Deliberately does not also insert a third, distinct value on this same
+     * $this->connection afterward to confirm the table still accepts writes:
+     * confirmed live (see docs/known-limitations.md) that this driver leaves
+     * a connection unable to run any further query at all after *any* DML
+     * error - not specific to unique violations - so doing that here would
+     * conflate this test's actual claim with that separate, more general bug.
+     */
+    public function testCreatingATableWithAUniqueIndexEnforcesUniqueness(): void
+    {
+        $table = $this->createTable('tmp_unique');
+        $table->addUniqueIndex(['name'], 'idx_tmp_unique_name');
+
+        $sm = $this->connection->createSchemaManager();
+        $sm->createTable($table);
+
+        try {
+            $this->connection->insert('tmp_unique', ['id' => '1', 'name' => 'dup']);
+
+            try {
+                $this->connection->insert('tmp_unique', ['id' => '2', 'name' => 'dup']);
+                $this->fail('Expected the unique index to reject a duplicate "name" value.');
+            } catch (\Exception $e) {
+                $this->assertStringContainsString('Conflict with existing key', $e->getMessage());
+            }
+        } finally {
+            $sm->dropTable('tmp_unique');
+        }
+    }
+
+    /**
+     * FK-stripping is also exercised via Doctrine ORM's SchemaTool (the plural
+     * getCreateTablesSQL()) through ForeignKeyTestCase, but
+     * YdbSchemaManager::createTable() - used directly here, and by anything
+     * that isn't going through the ORM - hits the *singular* getCreateTableSQL(),
+     * a distinct code path that was never exercised with an actual
+     * ForeignKeyConstraint attached.
+     */
+    public function testCreatingATableWithAForeignKeyThroughTheSchemaManagerSucceeds(): void
+    {
+        $sm = $this->connection->createSchemaManager();
+
+        $parent = $this->createTable('tmp_fk_parent');
+        $sm->createTable($parent);
+
+        try {
+            $child = new Table('tmp_fk_child');
+            $child->addColumn('id', Types::STRING);
+            $child->addColumn('parent_id', Types::STRING);
+            $child->setPrimaryKey(['id']);
+            $child->addForeignKeyConstraint('tmp_fk_parent', ['parent_id'], ['id']);
+
+            $sm->createTable($child);
+
+            $this->assertTrue($sm->tablesExist(['tmp_fk_child']));
+        } finally {
+            if ($sm->tablesExist(['tmp_fk_child'])) {
+                $sm->dropTable('tmp_fk_child');
+            }
+
+            $sm->dropTable('tmp_fk_parent');
+        }
+    }
 }
