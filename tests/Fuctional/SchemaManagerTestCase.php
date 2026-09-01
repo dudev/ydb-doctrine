@@ -104,14 +104,11 @@ class SchemaManagerTestCase extends AbstractFunctionalCase
      * only "GLOBAL UNIQUE SYNC ON (...)" (explicit SYNC) actually rejects a
      * conflicting write, for INSERT and UPSERT alike - see
      * YdbPlatform::getIndexDeclarationSQL(). Pins that a real conflicting
-     * insert, not just the CREATE TABLE statement, is genuinely rejected.
-     *
-     * Deliberately does not also insert a third, distinct value on this same
-     * $this->connection afterward to confirm the table still accepts writes:
-     * confirmed live (see docs/known-limitations.md) that this driver leaves
-     * a connection unable to run any further query at all after *any* DML
-     * error - not specific to unique violations - so doing that here would
-     * conflate this test's actual claim with that separate, more general bug.
+     * insert, not just the CREATE TABLE statement, is genuinely rejected -
+     * and, now that YdbStatement::clearDeadTransaction() fixes the connection
+     * up after that rejection (see testConnectionRecoversAfterADmlError()),
+     * that a distinct value is still accepted right afterward on the same
+     * connection.
      */
     public function testCreatingATableWithAUniqueIndexEnforcesUniqueness(): void
     {
@@ -130,8 +127,53 @@ class SchemaManagerTestCase extends AbstractFunctionalCase
             } catch (\Exception $e) {
                 $this->assertStringContainsString('Conflict with existing key', $e->getMessage());
             }
+
+            $this->connection->insert('tmp_unique', ['id' => '3', 'name' => 'distinct']);
+            $this->assertEquals(
+                'distinct',
+                $this->connection->fetchOne('SELECT name FROM tmp_unique WHERE id = ?', ['3'], [Types::STRING]),
+            );
         } finally {
             $sm->dropTable('tmp_unique');
+        }
+    }
+
+    /**
+     * Session::query() (reached via Session::prepare()->execute(), the path
+     * every DML statement takes) reuses the SDK session's internal tx_id
+     * across calls, only opening a fresh transaction when it's null - it
+     * never clears it after a failed statement. Confirmed live (before the
+     * fix in YdbStatement::clearDeadTransaction()) that this left a
+     * connection permanently stuck reusing a transaction the server had
+     * already aborted: every later query on it - regardless of whether it
+     * had anything to do with the original failure - started failing with
+     * "Transaction not found", for something as ordinary as a duplicate
+     * PRIMARY KEY insert (no unique secondary index needed to trigger it at
+     * all). This pins that recovery in the simplest possible case.
+     */
+    public function testConnectionRecoversAfterADmlError(): void
+    {
+        $sm = $this->connection->createSchemaManager();
+        $sm->createTable($this->createTable('tmp_recover'));
+
+        try {
+            $this->connection->insert('tmp_recover', ['id' => '1', 'name' => 'first']);
+
+            try {
+                $this->connection->insert('tmp_recover', ['id' => '1', 'name' => 'duplicate-pk']);
+                $this->fail('Expected a duplicate PRIMARY KEY insert to fail.');
+            } catch (\Exception $e) {
+                // The specific failure isn't the point here - see
+                // testCreatingATableWithAUniqueIndexEnforcesUniqueness() for that.
+            }
+
+            $this->connection->insert('tmp_recover', ['id' => '2', 'name' => 'second']);
+            $this->assertEquals(
+                'second',
+                $this->connection->fetchOne('SELECT name FROM tmp_recover WHERE id = ?', ['2'], [Types::STRING]),
+            );
+        } finally {
+            $sm->dropTable('tmp_recover');
         }
     }
 
