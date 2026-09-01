@@ -15,14 +15,9 @@ final class YdbConnection implements Connection
 {
     /**
      * Pinned once for this connection's whole lifetime, not re-fetched per
-     * call: Table::session() hands out a *different* session from its pool on
-     * every call (see Table::takeSession()), so beginTransaction()/commit()/
-     * statement execution would otherwise silently run against unrelated
-     * sessions - confirmed live this leaves transactions dangling (never
-     * actually committed on the session that opened them) until YDB's
-     * MaxTxPerSession cap is hit. One real session per DBAL Connection,
-     * matching how every other DBAL driver behaves, fixes both the
-     * transaction-coherency bug and the session leak.
+     * call: Table::session() hands out a *different* pooled session every
+     * call, so begin/commit/statements would otherwise silently run against
+     * unrelated sessions.
      */
     private Session $session;
 
@@ -34,19 +29,9 @@ final class YdbConnection implements Connection
     }
 
     /**
-     * Table::$session_pool (see YdbPlatform\Ydb\Table::session()/takeSession())
-     * is a process-wide static pool: a session is only ever handed back out as
-     * "idle" once something calls Session::release()/delete() on it, and
-     * nothing did for the lifetime of this class until now - DBAL's own
-     * Connection::close() (called by consumers, e.g. in test tearDown()) only
-     * drops its local reference, it never reaches the driver at all. Left
-     * unfixed, every YdbConnection ever created permanently pins one real YDB
-     * session as "busy" for the rest of the process, and confirmed live that
-     * enough of those accumulating in one PHPUnit run - each a candidate for
-     * the pool to (incorrectly, since nothing marked it reusable) keep handing
-     * back out - eventually trips YDB's MaxTxPerSession cap on whichever one
-     * gets reused. Deleting the session once this connection itself is done
-     * for closes it out cleanly instead.
+     * DBAL's Connection::close() only drops its local reference and never
+     * reaches the driver, so nothing else releases this session back to
+     * Table's process-wide pool - delete it here instead.
      */
     public function __destruct()
     {

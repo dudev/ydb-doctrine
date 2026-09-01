@@ -91,34 +91,17 @@ class YdbSchemaManager extends AbstractSchemaManager
     }
 
     /**
-     * Requires a live YDB server that implements Ydb.View.V1.ViewService.DescribeView -
-     * a draft API (see ydb-api-protos' draft/protos/ydb_view.proto) that, as of this
-     * writing, no released YDB server implements yet: the RPC is wired into the gRPC
-     * surface (ydb/services/view/grpc_service.cpp upstream), but there is no
-     * DoDescribeView handler behind it (verified live and by reading upstream source -
-     * every other Describe* RPC has a corresponding rpc_describe_*.cpp, DescribeView
-     * does not), so every call fails with gRPC UNIMPLEMENTED. The client-side plumbing
-     * ($ydb->view()->describeView()) is correct and was exercised against a live
-     * server up to the point the server rejects the RPC; this will work as-is once a
-     * server ships a real handler. Until then, that specific failure is caught below
-     * and rethrown with an explanation instead of a raw gRPC exception - views created
-     * via plain SQL are unaffected, only this introspection path is blocked.
+     * Two independent reasons this can fail today, both caught below and
+     * rethrown with an explanation rather than a raw error - views created
+     * via plain SQL are unaffected either way, only introspection is blocked:
+     * the real published SDK has no View::describeView() at all (only the
+     * dudev/ydb-php-sdk fork does, and a public package can't depend on a
+     * fork); and no released YDB server implements the DescribeView RPC yet
+     * even when the SDK does.
      *
-     * View::describeView() itself only exists on the dudev/ydb-php-sdk fork, not yet
-     * on the officially published ydb-platform/ydb-php-sdk that composer.json
-     * declares as this package's dependency (a public package can't require a git
-     * fork - see the discussion that led here). So on a stock install, $ydb->view()
-     * is simply undefined - guarded below with the same "views without SQL access
-     * are unaffected" framing as the UNIMPLEMENTED case above.
-     *
-     * Entry type detection below accepts both 'VIEW' and the raw int 20: on the
-     * real published SDK, Ydb.Scheme.Entry.Type's generated PHP enum still stops
-     * at TOPIC = 17 (same stale-codegen bug the fix/scheme-entry-type-view fork PR
-     * addresses), so protobuf's JSON decoding of an unrecognized enum value falls
-     * back to the bare int instead of a name - confirmed live: listDirectory()
-     * reports a real view's type as int(20), not "VIEW". Comparing only against
-     * the string would make this method silently report zero views on a stock
-     * install instead of the intended explanatory exception below.
+     * Entry type is checked against both 'VIEW' and the raw int 20: the stock
+     * SDK's stale Entry\Type enum makes listDirectory() report a view's type
+     * as the bare int, not the string.
      *
      * @return list<View>
      */

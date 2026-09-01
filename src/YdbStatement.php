@@ -23,16 +23,10 @@ class YdbStatement implements Statement
     private array $parameters = [];
 
     /**
-     * A specific Session instance, not Table (which hands out a *different*
-     * session from its pool on every call - see Table::session()/takeSession()).
-     * Statements must run on the exact same session Driver\YdbConnection pinned
-     * for its whole lifetime, or transactions silently stop being coherent:
-     * confirmed live that beginTransaction()/commit() calling $table->session()
-     * independently (as this class used to via a Table) each grab whatever
-     * session happens to be idle, so a transaction begun on one session could
-     * be "committed" on a completely different one that never saw it - the
-     * original session's transaction is then never actually finished and stays
-     * active on the server until YDB's MaxTxPerSession cap is hit.
+     * Must be the exact Session Driver\YdbConnection pinned for its lifetime,
+     * not a Table (which hands out a *different* pooled session on every
+     * call - see Table::session()/takeSession()) - otherwise a transaction
+     * begun on one session can get "committed" on another that never saw it.
      */
     public function __construct(
         private string $sql,
@@ -73,13 +67,7 @@ class YdbStatement implements Statement
             ?? throw new \Exception('preg_replace failed on: ' . $sql);
     }
 
-    /**
-     * $value is either a plain scalar/DateTime bound with a native DBAL ParameterType
-     * (STRING/INTEGER/BOOLEAN/BINARY), or a YdbBoundValue produced by one of the custom
-     * Doctrine\DBAL\Types\Type::convertToDatabaseValue() implementations (Datetime/Json/
-     * Float/Decimal) that need a more specific YQL type than DBAL's ParameterType enum
-     * can express.
-     */
+    /** $value is a plain scalar/DateTime with a native ParameterType, or a YdbBoundValue needing a more specific YQL type. */
     private function makeYdbType(mixed $value, ParameterType $type): TypedValue
     {
         if ($value instanceof YdbBoundValue) {
@@ -148,23 +136,11 @@ class YdbStatement implements Statement
     }
 
     /**
-     * Session::query() (reached via Session::prepare()->execute()) reuses
-     * $session->tx_id across calls, only opening a fresh transaction when it's
-     * null - it never clears it after a failed statement. Left alone, this
-     * session is permanently stuck reusing a transaction id the server has
-     * already aborted: confirmed live that every later query on it - including
-     * ones with nothing to do with whatever failed - starts failing with
-     * "Transaction not found", forever, for something as ordinary as a
-     * duplicate PRIMARY KEY insert.
-     *
-     * The obvious fix - just call $session->rollBack() - doesn't work: both
-     * Session::commitTransaction() and rollbackTransaction() only reset their
-     * internal tx_id *after* their RPC call succeeds, and that RPC itself fails
-     * precisely because the transaction is already dead (the exact case being
-     * recovered from here) - an upstream SDK bug, confirmed live. Reflection is
-     * the only way left to force tx_id back to null from outside the class, so
-     * the next statement begins a genuinely fresh transaction instead of
-     * reusing a dead one.
+     * Session::query() reuses tx_id across calls and never clears it on
+     * failure, so a session gets stuck reusing a transaction the server has
+     * already aborted. $session->rollBack() alone doesn't fix it either: its
+     * own RPC fails for the same reason, before it resets tx_id (upstream SDK
+     * bug) - reflection is the only way left to force it from outside the class.
      */
     private function clearDeadTransaction(): void
     {
