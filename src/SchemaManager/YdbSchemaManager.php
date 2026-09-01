@@ -111,21 +111,25 @@ class YdbSchemaManager extends AbstractSchemaManager
      * is simply undefined - guarded below with the same "views without SQL access
      * are unaffected" framing as the UNIMPLEMENTED case above.
      *
+     * Entry type detection below accepts both 'VIEW' and the raw int 20: on the
+     * real published SDK, Ydb.Scheme.Entry.Type's generated PHP enum still stops
+     * at TOPIC = 17 (same stale-codegen bug the fix/scheme-entry-type-view fork PR
+     * addresses), so protobuf's JSON decoding of an unrecognized enum value falls
+     * back to the bare int instead of a name - confirmed live: listDirectory()
+     * reports a real view's type as int(20), not "VIEW". Comparing only against
+     * the string would make this method silently report zero views on a stock
+     * install instead of the intended explanatory exception below.
+     *
      * @return list<View>
      */
     public function listViews(): array
     {
         $views = [];
         foreach ($this->ydb->scheme()->listDirectory() as $entry) {
-            if ('VIEW' !== $entry['type']) {
+            if ('VIEW' !== $entry['type'] && 20 !== $entry['type']) {
                 continue;
             }
 
-            // phpstan sees Ydb::view() as always present because this package's dev
-            // vendor/ is locally patched with the dudev/ydb-php-sdk fork (see the
-            // docblock above) - but composer.json declares the real upstream SDK,
-            // which doesn't have it, so this check is genuinely reachable for users.
-            // @phpstan-ignore function.alreadyNarrowedType
             if (!method_exists($this->ydb, 'view')) {
                 throw new \Exception(
                     "Cannot list view '{$entry['name']}': the installed ydb-platform/ydb-php-sdk " .
