@@ -2,7 +2,7 @@
 
 namespace Dudev\YdbDoctrine\Tests\App\Entity;
 
-use DateTimeImmutable;
+use DateTimeInterface;
 use Dudev\YdbDoctrine\Tests\App\Repository\UserRepository;
 use Doctrine\ORM\Mapping\Column;
 use Doctrine\ORM\Mapping\Entity;
@@ -23,8 +23,12 @@ class User
     #[Column(type: 'integer', nullable: true)]
     public int $age;
 
+    // ydb-doctrine's DateTimeTzType converter hydrates a mutable \DateTime (see
+    // src/Type/DateTimeTzType.php::convertToPHPValue()) - not DateTimeImmutable,
+    // even though the type name says "tz". Typed as the interface so both the
+    // constructor's DateTimeImmutable arg and hydration's DateTime are valid.
     #[Column(type: 'datetimetz', nullable: true)]
-    public DateTimeImmutable $createAt;
+    public DateTimeInterface $createAt;
 
     #[Column(type: 'boolean', nullable: true)]
     public bool $active;
@@ -36,7 +40,7 @@ class User
         int $id,
         string $name,
         int $age,
-        DateTimeImmutable $createAt,
+        DateTimeInterface $createAt,
         bool $active,
         bool $delete,
     ) {

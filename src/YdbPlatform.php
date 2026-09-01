@@ -8,6 +8,8 @@ use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Platforms\AbstractPlatform;
 use Doctrine\DBAL\Platforms\DateIntervalUnit;
 use Doctrine\DBAL\Platforms\Keywords\KeywordList;
+use Doctrine\DBAL\Schema\Index;
+use Doctrine\DBAL\Schema\Table;
 use Doctrine\DBAL\Schema\TableDiff;
 use Doctrine\DBAL\TransactionIsolationLevel;
 use YdbPlatform\Ydb\Ydb;
@@ -57,6 +59,80 @@ final class YdbPlatform extends AbstractPlatform
     public function getAlterTableSQL(TableDiff $diff): array
     {
         return [];
+    }
+
+    /**
+     * YDB has no FOREIGN KEY constraint concept at all - confirmed via ydb.tech's
+     * CREATE TABLE grammar reference (no REFERENCES/FOREIGN KEY syntax anywhere in
+     * it) and the upstream roadmap, which never mentions referential integrity.
+     * DBAL's default getCreateTableSQL()/getCreateTablesSQL()/getDropTablesSQL()
+     * unconditionally emit ALTER TABLE ... ADD/DROP CONSTRAINT ... FOREIGN KEY
+     * statements for any Table/Schema that declares one - which just fails against
+     * a live server. All three are overridden below to drop foreign keys from the
+     * generated DDL instead, the same "silently unsupported" treatment already
+     * used for getDefaultValueDeclarationSQL()'s "Нет DEFAULT". Doctrine ORM
+     * associations (ManyToOne/JoinColumn) still work fine without a DB-level
+     * constraint - only server-side enforcement is unavailable, and the FK column
+     * itself is created and populated normally either way.
+     *
+     * getCreateTableSQL()/getDropTablesSQL(fine-grained per Table) matter for
+     * direct SchemaManager usage (YdbSchemaManager::createTable()/dropTable());
+     * getCreateTablesSQL()/getDropTablesSQL() (plural) are what Doctrine ORM's
+     * SchemaTool::createSchema()/dropSchema() actually call under the hood
+     * (via Schema::toSql()/toDropSql()) - both paths need the override.
+     */
+    public function getCreateTableSQL(Table $table): array
+    {
+        return $this->getCreateTableWithoutForeignKeysSQL($table);
+    }
+
+    /** @param array<Table> $tables */
+    public function getCreateTablesSQL(array $tables): array
+    {
+        $sql = [];
+        foreach ($tables as $table) {
+            $sql = array_merge($sql, $this->getCreateTableWithoutForeignKeysSQL($table));
+        }
+
+        return $sql;
+    }
+
+    /** @param array<Table> $tables */
+    public function getDropTablesSQL(array $tables): array
+    {
+        $sql = [];
+        foreach ($tables as $table) {
+            $sql[] = $this->getDropTableSQL($table->getQuotedName($this));
+        }
+
+        return $sql;
+    }
+
+    /**
+     * YDB's inline secondary-index grammar (ydb.tech's CREATE TABLE reference:
+     * INDEX <name> [GLOBAL] [SYNC|ASYNC] [USING <type>] ON (<columns>)
+     * [COVER (...)]) needs "ON (...)" where DBAL's generic default just uses
+     * "(...)", and - despite the docs listing GLOBAL as optional - verified live
+     * that this YDB build rejects the statement without it ("Unexpected token
+     * 'INDEX'"); with GLOBAL present it's accepted (SYNC/ASYNC can be omitted,
+     * defaults to sync). Doctrine ORM emits an index like this automatically for
+     * every ManyToOne/JoinColumn (the FK column gets one for query performance,
+     * even without any DB-level FK constraint - see getCreateTablesSQL() above).
+     * UNIQUE indexes aren't part of YDB's documented index grammar at all, so
+     * rather than silently emit a UNIQUE clause YDB would either reject or
+     * (worse) silently not enforce, that case throws.
+     */
+    public function getIndexDeclarationSQL(Index $index): string
+    {
+        if ($index->isUnique()) {
+            throw new \Exception(
+                'YdbPlatform::getIndexDeclarationSQL: YDB has no documented UNIQUE secondary ' .
+                "index support, refusing to silently emit one for index '{$index->getName()}'.",
+            );
+        }
+
+        return 'INDEX ' . $index->getQuotedName($this) . ' GLOBAL ON (' .
+            implode(', ', $index->getQuotedColumns($this)) . ')';
     }
 
     public function createSchemaManager(Connection $connection): YdbSchemaManager

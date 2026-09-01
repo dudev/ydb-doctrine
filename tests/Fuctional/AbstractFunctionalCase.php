@@ -54,7 +54,7 @@ abstract class AbstractFunctionalCase extends TestCase
         $tool = new \Doctrine\ORM\Tools\SchemaTool($em);
         $classes = [];
         foreach ($entityClasses as $className) {
-            $classes = [$em->getClassMetadata($className)];
+            $classes[] = $em->getClassMetadata($className);
         }
 
         $tool->dropSchema($classes);
