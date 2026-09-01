@@ -12,49 +12,24 @@ use Doctrine\ORM\Mapping\ToOneOwningSideMapping;
 use Doctrine\ORM\UnitOfWork;
 
 /**
- * YDB has no FOREIGN KEY support (see YdbPlatform::getCreateTablesSQL()), so
- * nothing at the database level stops an insert/update from writing a to-one
- * association that points at a row which doesn't exist. This listener is the
- * library-level replacement: on every flush, for every to-one owning-side
- * association (ManyToOne, owning-side OneToOne) that is currently non-null on
- * an entity being inserted or updated, it verifies the referenced row actually
- * exists - inside the same transaction flush() already opens, so YDB's
- * serializable isolation covers the race between this check and the commit
- * (a concurrent delete of the referenced row aborts the transaction instead of
- * silently racing past it).
+ * YDB has no FOREIGN KEY support (see YdbPlatform::getCreateTablesSQL()); this
+ * is the library-level replacement. On insert/update, every non-null to-one
+ * owning-side association is checked for a live referenced row, inside the
+ * same transaction flush() opens. A target scheduled for insertion in the
+ * same flush is skipped (commit ordering already guarantees it exists by
+ * then); a target scheduled for deletion in the same flush throws
+ * immediately without querying, since the row is still physically present
+ * when onFlush runs and a plain existence check would miss it.
  *
- * An association pointing at an entity that is itself scheduled for insertion
- * in this same flush is skipped: Doctrine's own commit ordering already
- * guarantees the parent row is inserted before the child, regardless of DB
- * engine, so there is nothing to check yet.
+ * The delete side is the ON DELETE RESTRICT equivalent: deleting a row another
+ * already-persisted row still references is rejected, unless that dependent
+ * is itself being deleted in the same flush.
  *
- * An association pointing at an entity that is scheduled for *deletion* in
- * this same flush is rejected outright, without even querying the database:
- * confirmed live that without this, `$em->remove($user); $post->author =
- * $user; $em->persist($post); $em->flush();` succeeds silently and leaves
- * post.author_id pointing at a row that no longer exists the moment this
- * transaction commits - the plain existence check alone can't catch it
- * because onFlush fires before any SQL runs, so the row is still physically
- * there when the SELECT would execute.
- *
- * The second half of this listener covers the opposite direction: deleting a
- * row that other, already-persisted rows still reference (the ON DELETE
- * RESTRICT equivalent). For every entity scheduled for deletion, it scans
- * every *other* mapped entity class for a to-one owning-side association
- * targeting this one, and checks whether any row in that dependent table
- * currently points at the row being deleted. A dependent row that is itself
- * scheduled for deletion in this same flush doesn't count - deleting a parent
- * together with its dependents in one flush is meant to work, same spirit as
- * the insert-side skip above.
- *
- * Known limitation, not handled: a dependent row that is scheduled for
- * *update* in this same flush to repoint its association away from the row
- * being deleted (rather than being deleted itself). That row still physically
- * references the parent at the moment this check runs (onFlush fires before
- * any SQL executes), so it is conservatively treated as still blocking - the
- * same restriction an FK constraint without deferred checking would impose.
- * Work around it by flushing the repoint first, then deleting the parent in a
- * second flush.
+ * Known limitation: a dependent scheduled for *update* (repointing its
+ * association away, rather than being deleted) still blocks - conservatively
+ * treated as still referencing the parent, since it does until that update
+ * executes. Work around it by flushing the repoint first, then deleting the
+ * parent in a second flush.
  */
 class ReferentialIntegrityListener
 {
@@ -76,13 +51,7 @@ class ReferentialIntegrityListener
         }
     }
 
-    /**
-     * @param list<string>|null $onlyFields null means "check every to-one association";
-     *                                      otherwise restrict to fields that actually
-     *                                      changed in this flush (an update that never
-     *                                      touched the association was already checked
-     *                                      when it was first set).
-     */
+    /** @param list<string>|null $onlyFields fields changed this flush, or null for every association */
     private function checkAssociations(
         EntityManagerInterface $em,
         UnitOfWork $uow,
@@ -188,11 +157,8 @@ class ReferentialIntegrityListener
         ToOneOwningSideMapping $mapping,
         object $sourceEntity,
     ): bool {
-        // checkDependents() scans every *mapped* class, regardless of whether its
-        // table has actually been created yet (e.g. a migration for a newly added
-        // entity hasn't run in this environment) - confirmed live that without this
-        // guard, that case crashes with a raw scheme error instead of correctly
-        // treating "the table doesn't exist" as "nothing in it references this row".
+        // A mapped class whose table doesn't exist yet (e.g. an unmigrated new
+        // entity) has no dependents by definition - guard instead of crashing.
         if (!$em->getConnection()->createSchemaManager()->tablesExist([$dependentClass->getTableName()])) {
             return false;
         }
