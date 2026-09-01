@@ -9,7 +9,7 @@ use Doctrine\DBAL\ParameterType;
 use Ydb\Type;
 use Ydb\TypedValue;
 use YdbPlatform\Ydb\QueryResult;
-use YdbPlatform\Ydb\Table;
+use YdbPlatform\Ydb\Session;
 use YdbPlatform\Ydb\Traits\TypeValueHelpersTrait;
 
 class YdbStatement implements Statement
@@ -22,9 +22,21 @@ class YdbStatement implements Statement
     /** @var array<string, TypedValue> */
     private array $parameters = [];
 
+    /**
+     * A specific Session instance, not Table (which hands out a *different*
+     * session from its pool on every call - see Table::session()/takeSession()).
+     * Statements must run on the exact same session Driver\YdbConnection pinned
+     * for its whole lifetime, or transactions silently stop being coherent:
+     * confirmed live that beginTransaction()/commit() calling $table->session()
+     * independently (as this class used to via a Table) each grab whatever
+     * session happens to be idle, so a transaction begun on one session could
+     * be "committed" on a completely different one that never saw it - the
+     * original session's transaction is then never actually finished and stays
+     * active on the server until YDB's MaxTxPerSession cap is hit.
+     */
     public function __construct(
         private string $sql,
-        private Table $table,
+        private Session $session,
     ) {
     }
 
@@ -117,11 +129,11 @@ class YdbStatement implements Statement
         $sql = $this->getRawSql();
         try {
             if (str_starts_with($sql, 'CREATE') || str_starts_with($sql, 'DROP')) {
-                $this->table->schemeQuery($sql);
+                $this->session->schemeQuery($sql);
 
                 return new YdbSchemaResult();
             } else {
-                $res = $this->table->prepare($sql)->execute($this->parameters);
+                $res = $this->session->prepare($sql)->execute($this->parameters);
                 if (!$res instanceof QueryResult) {
                     throw new \Exception('Expected a QueryResult, got: ' . get_debug_type($res));
                 }

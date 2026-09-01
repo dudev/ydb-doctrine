@@ -25,7 +25,7 @@ class YdbStatementTest extends TestCase
     public function testString(): void
     {
         $ydb = $this->makeYdb();
-        $statement = new YdbStatement('INSERT INTO my_table (name) VALUES (?)', $ydb->table());
+        $statement = new YdbStatement('INSERT INTO my_table (name) VALUES (?)', $ydb->table()->session());
         $statement->bindValue(1, 'name\test2');
         $this->assertEquals("DECLARE \$col1 AS UTF8;\nINSERT INTO my_table (name) VALUES (\$col1)", $statement->getRawSql());
     }
@@ -36,7 +36,7 @@ class YdbStatementTest extends TestCase
 
         $statement = new YdbStatement(
             'INSERT INTO doctrine_migration_versions (version, executed_at, execution_time) VALUES (?, ?, ?)',
-            $ydb->table(),
+            $ydb->table()->session(),
         );
         $statement->bindValue(1, 'DoctrineMigrations\Version20211102143635', ParameterType::STRING);
         $statement->bindValue(2, '2022-09-18 16:12:36', ParameterType::STRING);

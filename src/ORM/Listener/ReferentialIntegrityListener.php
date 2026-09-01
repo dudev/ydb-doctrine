@@ -188,6 +188,15 @@ class ReferentialIntegrityListener
         ToOneOwningSideMapping $mapping,
         object $sourceEntity,
     ): bool {
+        // checkDependents() scans every *mapped* class, regardless of whether its
+        // table has actually been created yet (e.g. a migration for a newly added
+        // entity hasn't run in this environment) - confirmed live that without this
+        // guard, that case crashes with a raw scheme error instead of correctly
+        // treating "the table doesn't exist" as "nothing in it references this row".
+        if (!$em->getConnection()->createSchemaManager()->tablesExist([$dependentClass->getTableName()])) {
+            return false;
+        }
+
         $sourceClass = $em->getClassMetadata($mapping->targetEntity);
 
         /** @var array<string, array{0: mixed, 1: string}> $sourceIdentifierByColumn */

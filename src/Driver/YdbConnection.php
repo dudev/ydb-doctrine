@@ -8,18 +8,52 @@ use Doctrine\DBAL\Driver\Connection;
 use Doctrine\DBAL\Driver\Result;
 use Doctrine\DBAL\Driver\Statement;
 use Psr\Log\LoggerInterface;
-use YdbPlatform\Ydb\Table;
+use YdbPlatform\Ydb\Session;
 use YdbPlatform\Ydb\Ydb;
 
 final class YdbConnection implements Connection
 {
-    private Table $table;
+    /**
+     * Pinned once for this connection's whole lifetime, not re-fetched per
+     * call: Table::session() hands out a *different* session from its pool on
+     * every call (see Table::takeSession()), so beginTransaction()/commit()/
+     * statement execution would otherwise silently run against unrelated
+     * sessions - confirmed live this leaves transactions dangling (never
+     * actually committed on the session that opened them) until YDB's
+     * MaxTxPerSession cap is hit. One real session per DBAL Connection,
+     * matching how every other DBAL driver behaves, fixes both the
+     * transaction-coherency bug and the session leak.
+     */
+    private Session $session;
 
     public function __construct(
         private Ydb $ydb
     ) {
-        $this->table = $this->ydb->table();
-        $this->table->session()->keepAlive();
+        $this->session = $this->ydb->table()->session();
+        $this->session->keepAlive();
+    }
+
+    /**
+     * Table::$session_pool (see YdbPlatform\Ydb\Table::session()/takeSession())
+     * is a process-wide static pool: a session is only ever handed back out as
+     * "idle" once something calls Session::release()/delete() on it, and
+     * nothing did for the lifetime of this class until now - DBAL's own
+     * Connection::close() (called by consumers, e.g. in test tearDown()) only
+     * drops its local reference, it never reaches the driver at all. Left
+     * unfixed, every YdbConnection ever created permanently pins one real YDB
+     * session as "busy" for the rest of the process, and confirmed live that
+     * enough of those accumulating in one PHPUnit run - each a candidate for
+     * the pool to (incorrectly, since nothing marked it reusable) keep handing
+     * back out - eventually trips YDB's MaxTxPerSession cap on whichever one
+     * gets reused. Deleting the session once this connection itself is done
+     * for closes it out cleanly instead.
+     */
+    public function __destruct()
+    {
+        try {
+            $this->session->delete();
+        } catch (\Throwable) {
+        }
     }
 
     public static function makeConnectionByUrl(string $dbUri, LoggerInterface $logger = null): YdbConnection
@@ -42,7 +76,7 @@ final class YdbConnection implements Connection
 
     public function prepare(string $sql): Statement
     {
-        return new YdbStatement($sql, $this->table);
+        return new YdbStatement($sql, $this->session);
     }
 
     public function query(string $sql): Result
@@ -69,18 +103,18 @@ final class YdbConnection implements Connection
 
     public function beginTransaction(): void
     {
-        $this->table->session()->beginTransaction();
+        $this->session->beginTransaction();
     }
 
     public function commit(): void
     {
-        $this->table->session()->commit();
+        $this->session->commit();
     }
 
     public function rollBack(): void
     {
         try {
-            $this->table->session()->rollBack();
+            $this->session->rollBack();
         } catch (\Throwable) {
         }
     }
