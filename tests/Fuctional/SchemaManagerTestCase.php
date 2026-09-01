@@ -53,10 +53,16 @@ class SchemaManagerTestCase extends AbstractFunctionalCase
 
         $sm->createTable($this->createTable('tmp_event'));
 
-        $this->assertNotEmpty($sm->listTables());
-        $tableInfo = $sm->listTables()[0];
-
-        $this->assertEquals('tmp_event', $tableInfo->getName());
+        try {
+            // The live DB is shared across the whole test run with no per-class
+            // reset, so other tests' tables may legitimately coexist here -
+            // assert tmp_event is present rather than assuming it's the only
+            // (or first) table.
+            $names = array_map(static fn ($table) => $table->getName(), $sm->listTables());
+            $this->assertContains('tmp_event', $names);
+        } finally {
+            $sm->dropTable('tmp_event');
+        }
     }
 
     /**
