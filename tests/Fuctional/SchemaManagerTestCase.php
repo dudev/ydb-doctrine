@@ -4,7 +4,6 @@ namespace Dudev\YdbDoctrine\Tests\Fuctional;
 
 use Doctrine\DBAL\Schema\Table;
 use Doctrine\DBAL\Types\Types;
-use YdbPlatform\Ydb\Exceptions\Grpc\UnimplementedException;
 
 class SchemaManagerTestCase extends AbstractFunctionalCase
 {
@@ -61,13 +60,18 @@ class SchemaManagerTestCase extends AbstractFunctionalCase
     }
 
     /**
-     * Pins today's known server limitation: no released YDB implements
-     * Ydb.View.V1.ViewService.DescribeView yet (see YdbSchemaManager::listViews()),
-     * so listing a real view currently fails - but with our own explanatory
-     * exception, not a raw gRPC one. Once a server ships a handler, this test
-     * should flip to asserting listViews() succeeds and returns the view.
+     * Pins today's real, installable state: composer.json declares the official
+     * ydb-platform/ydb-php-sdk (a public package can't depend on a git fork), and
+     * that SDK has no View::describeView() support at all - so listing a real
+     * view currently fails with our own explanatory exception, not a raw "call to
+     * undefined method" or a silently empty result. This also exercises the
+     * int(20)-vs-'VIEW' entry-type detection in listViews(): confirmed live that
+     * the stock SDK's stale Entry\Type enum makes listDirectory() report a view's
+     * type as the bare int 20, not the string "VIEW". Once a released SDK ships
+     * View::describeView(), this test should flip to asserting against a live
+     * server's behavior instead (see YdbSchemaManager::listViews()).
      */
-    public function testListViewsWrapsUnimplementedDescribeView(): void
+    public function testListViewsThrowsOnStockSdkWithoutDescribeView(): void
     {
         $sm = $this->connection->createSchemaManager();
         $sm->createTable($this->createTable('tmp_view_source'));
@@ -77,10 +81,9 @@ class SchemaManagerTestCase extends AbstractFunctionalCase
 
         try {
             $sm->listViews();
-            $this->fail('Expected an exception because this YDB server does not implement DescribeView.');
+            $this->fail('Expected an exception: the installed SDK has no View::describeView() support.');
         } catch (\Exception $e) {
-            $this->assertStringContainsString('Ydb.View.V1.ViewService.DescribeView', $e->getMessage());
-            $this->assertInstanceOf(UnimplementedException::class, $e->getPrevious());
+            $this->assertStringContainsString('View::describeView()', $e->getMessage());
         } finally {
             $this->connection->executeStatement('DROP VIEW tmp_v');
             $sm->dropTable('tmp_view_source');
