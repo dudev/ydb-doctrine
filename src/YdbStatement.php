@@ -141,7 +141,42 @@ class YdbStatement implements Statement
                 return new YdbResult($res);
             }
         } catch (\Throwable $ex) {
+            $this->clearDeadTransaction();
+
             throw new \Exception($sql . "\n" . ' Details: ' . $ex->getMessage(), previous: $ex);
+        }
+    }
+
+    /**
+     * Session::query() (reached via Session::prepare()->execute()) reuses
+     * $session->tx_id across calls, only opening a fresh transaction when it's
+     * null - it never clears it after a failed statement. Left alone, this
+     * session is permanently stuck reusing a transaction id the server has
+     * already aborted: confirmed live that every later query on it - including
+     * ones with nothing to do with whatever failed - starts failing with
+     * "Transaction not found", forever, for something as ordinary as a
+     * duplicate PRIMARY KEY insert.
+     *
+     * The obvious fix - just call $session->rollBack() - doesn't work: both
+     * Session::commitTransaction() and rollbackTransaction() only reset their
+     * internal tx_id *after* their RPC call succeeds, and that RPC itself fails
+     * precisely because the transaction is already dead (the exact case being
+     * recovered from here) - an upstream SDK bug, confirmed live. Reflection is
+     * the only way left to force tx_id back to null from outside the class, so
+     * the next statement begins a genuinely fresh transaction instead of
+     * reusing a dead one.
+     */
+    private function clearDeadTransaction(): void
+    {
+        try {
+            $this->session->rollBack();
+        } catch (\Throwable) {
+            try {
+                $property = new \ReflectionProperty($this->session, 'tx_id');
+                $property->setAccessible(true);
+                $property->setValue($this->session, null);
+            } catch (\Throwable) {
+            }
         }
     }
 }
