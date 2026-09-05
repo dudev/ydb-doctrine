@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "58d01e237de110149265fcc9354e03d4",
+    "content-hash": "22aa6cc51ff8d541ead7dd15d11424ab",
     "packages": [
         {
             "name": "doctrine/collections",
@@ -2251,16 +2251,16 @@
         },
         {
             "name": "ydb-platform/ydb-php-sdk",
-            "version": "v1.16.3",
+            "version": "dev-dev",
             "source": {
                 "type": "git",
-                "url": "https://github.com/ydb-platform/ydb-php-sdk.git",
-                "reference": "ef95b97168d8a957470955f2a62646e7b1f7783e"
+                "url": "https://github.com/dudev/ydb-php-sdk.git",
+                "reference": "7a6ebbd5ca35507cd02030649929351250b97509"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/ydb-platform/ydb-php-sdk/zipball/ef95b97168d8a957470955f2a62646e7b1f7783e",
-                "reference": "ef95b97168d8a957470955f2a62646e7b1f7783e",
+                "url": "https://api.github.com/repos/dudev/ydb-php-sdk/zipball/7a6ebbd5ca35507cd02030649929351250b97509",
+                "reference": "7a6ebbd5ca35507cd02030649929351250b97509",
                 "shasum": ""
             },
             "require": {
@@ -2286,7 +2286,13 @@
                     "YdbPlatform\\Ydb\\": "src/"
                 }
             },
-            "notification-url": "https://packagist.org/downloads/",
+            "autoload-dev": {
+                "psr-4": {
+                    "YdbPlatform\\Ydb\\Test\\": "tests",
+                    "App\\": "examples/",
+                    "YdbPlatform\\Ydb\\Slo\\": "slo-workload"
+                }
+            },
             "license": [
                 "Apache-2.0"
             ],
@@ -2298,10 +2304,9 @@
             ],
             "description": "YDB PHP SDK",
             "support": {
-                "issues": "https://github.com/ydb-platform/ydb-php-sdk/issues",
-                "source": "https://github.com/ydb-platform/ydb-php-sdk/tree/v1.16.3"
+                "source": "https://github.com/dudev/ydb-php-sdk/tree/dev"
             },
-            "time": "2026-06-19T14:33:23+00:00"
+            "time": "2026-09-04T18:06:57+00:00"
         }
     ],
     "packages-dev": [
@@ -7002,7 +7007,9 @@
     ],
     "aliases": [],
     "minimum-stability": "stable",
-    "stability-flags": {},
+    "stability-flags": {
+        "ydb-platform/ydb-php-sdk": 20
+    },
     "prefer-stable": false,
     "prefer-lowest": false,
     "platform": {
