@@ -20,11 +20,17 @@
     "scripts": {
         "php-cs-fixer": "php-cs-fixer"
     },
+    "repositories": [
+        {
+            "type": "vcs",
+            "url": "https://github.com/dudev/ydb-php-sdk"
+        }
+    ],
     "require": {
         "php": "^8.2",
         "doctrine/dbal": "^4.4",
         "doctrine/orm": "^3.4,<3.6",
-        "ydb-platform/ydb-php-sdk": "^1.2",
+        "ydb-platform/ydb-php-sdk": "dev-dev",
         "symfony/cache": "^6.3"
     },
     "require-dev": {
