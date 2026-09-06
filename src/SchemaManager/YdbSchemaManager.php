@@ -45,14 +45,21 @@ class YdbSchemaManager extends AbstractSchemaManager
         $list = [];
         $data = $this->ydb->table()->session()->describeTable($table);
         foreach ($data['columns'] as $column) {
-            $notnull = true;
-            $type = $column['type']['typeId'] ?? null;
-            if (!$type) {
-                $type = $column['type']['optionalType']['item']['typeId'] ?? throw new \Exception();
-                $notnull = false;
+            $notnull = !isset($column['type']['optionalType']);
+            $item = $notnull ? $column['type'] : $column['type']['optionalType']['item'];
+
+            // Decimal has its own precision/scale struct instead of a typeId.
+            if (isset($item['decimalType'])) {
+                $list[$column['name']] = new Column($column['name'], $this->bindType(YdbTypes::DECIMAL), [
+                    'notnull' => $notnull,
+                    'precision' => $item['decimalType']['precision'],
+                    'scale' => $item['decimalType']['scale'],
+                ]);
+                continue;
             }
 
-            $list[$column['name']] = new Column($column['name'], $this->bindType($type), ['notnull' => $notnull]);
+            $wireType = $item['typeId'] ?? throw new \Exception("YDB: unrecognized column type for '{$column['name']}'");
+            $list[$column['name']] = new Column($column['name'], $this->bindType($wireType), ['notnull' => $notnull]);
         }
 
         return $list;
