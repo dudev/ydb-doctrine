@@ -194,7 +194,7 @@ final class YdbPlatform extends AbstractPlatform
 
     public function getSmallIntTypeDeclarationSQL(array $column): string
     {
-        return YdbTypes::STRING;
+        return YdbTypes::SMALL_INT;
     }
 
     // phpcs:ignore PSR2.Methods.MethodDeclaration.Underscore -- overrides AbstractPlatform's own underscore-prefixed name, can't rename

@@ -40,10 +40,14 @@ final class YdbTypes
         self::UTF8 => Types::STRING,
         self::JSON => Types::JSON,
         self::DATETIME => Types::DATETIME_MUTABLE,
+        self::INT16 => Types::SMALLINT,
         self::INT32 => Types::INTEGER,
+        self::INT64 => Types::BIGINT,
         self::BOOL => Types::BOOLEAN,
-        self::DATE => Types::DATETIME_MUTABLE,
+        self::DATE => Types::DATE_MUTABLE,
         self::FLOAT => Types::FLOAT,
+        self::DECIMAL => Types::DECIMAL,
+        self::UUID => Types::GUID,
     ];
 
     public static function toDbalType(string $name): Type
