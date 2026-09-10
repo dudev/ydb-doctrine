@@ -19,6 +19,8 @@ class TypeWireBindingTestCase extends AbstractFunctionalCase
         $table->addColumn('u', Types::GUID, ['notnull' => false]);
         $table->addColumn('big', Types::BIGINT, ['notnull' => false]);
         $table->addColumn('small', Types::SMALLINT, ['notnull' => false]);
+        $table->addColumn('f', Types::FLOAT, ['notnull' => false]);
+        $table->addColumn('sf', Types::SMALLFLOAT, ['notnull' => false]);
         $table->setPrimaryKey(['id']);
 
         return $table;
@@ -168,6 +170,49 @@ class TypeWireBindingTestCase extends AbstractFunctionalCase
             );
         } finally {
             $sm->dropTable('tmp_wire_smallint');
+        }
+    }
+
+    public function testFloatBindsAsDoublePrecision(): void
+    {
+        $sm = $this->connection->createSchemaManager();
+        $sm->createTable($this->createTable('tmp_wire_float'));
+
+        try {
+            $this->connection->insert(
+                'tmp_wire_float',
+                ['id' => 1, 'f' => M_PI],
+                ['id' => Types::INTEGER, 'f' => Types::FLOAT],
+            );
+
+            $this->assertSame(
+                M_PI,
+                $this->connection->fetchOne('SELECT f FROM tmp_wire_float WHERE id = ?', [1], [Types::INTEGER]),
+            );
+        } finally {
+            $sm->dropTable('tmp_wire_float');
+        }
+    }
+
+    public function testSmallFloatCreatesValidDdlAndRoundTrips(): void
+    {
+        $sm = $this->connection->createSchemaManager();
+        $sm->createTable($this->createTable('tmp_wire_smallfloat'));
+
+        try {
+            $this->connection->insert(
+                'tmp_wire_smallfloat',
+                ['id' => 1, 'sf' => M_PI],
+                ['id' => Types::INTEGER, 'sf' => Types::SMALLFLOAT],
+            );
+
+            $this->assertEqualsWithDelta(
+                M_PI,
+                $this->connection->fetchOne('SELECT sf FROM tmp_wire_smallfloat WHERE id = ?', [1], [Types::INTEGER]),
+                1e-6,
+            );
+        } finally {
+            $sm->dropTable('tmp_wire_smallfloat');
         }
     }
 }
