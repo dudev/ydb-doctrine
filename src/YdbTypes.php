@@ -45,7 +45,8 @@ final class YdbTypes
         self::INT64 => Types::BIGINT,
         self::BOOL => Types::BOOLEAN,
         self::DATE => Types::DATE_MUTABLE,
-        self::FLOAT => Types::FLOAT,
+        self::FLOAT => Types::SMALLFLOAT,
+        self::DOUBLE => Types::FLOAT,
         self::DECIMAL => Types::DECIMAL,
         self::UUID => Types::GUID,
     ];

@@ -220,6 +220,11 @@ final class YdbPlatform extends AbstractPlatform
 
     public function getFloatDeclarationSQL(array $column): string
     {
+        return YdbTypes::DOUBLE;
+    }
+
+    public function getSmallFloatDeclarationSQL(array $column): string
+    {
         return YdbTypes::FLOAT;
     }
 

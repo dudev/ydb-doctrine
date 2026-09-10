@@ -7,6 +7,7 @@ use Dudev\YdbDoctrine\Type\DateTimeTzType;
 use Dudev\YdbDoctrine\Type\DecimalType;
 use Dudev\YdbDoctrine\Type\FloatType;
 use Dudev\YdbDoctrine\Type\JsonType;
+use Dudev\YdbDoctrine\Type\SmallFloatType;
 use Dudev\YdbDoctrine\Type\WireTypeDecorator;
 use Dudev\YdbDoctrine\YdbPlatform;
 use Dudev\YdbDoctrine\YdbTypes;
@@ -50,6 +51,7 @@ class YdbDriver implements Driver
         Type::overrideType(Types::DATETIME_MUTABLE, DateTimeType::class);
         Type::overrideType(Types::DATETIMETZ_MUTABLE, DateTimeTzType::class);
         Type::overrideType(Types::FLOAT, FloatType::class);
+        Type::overrideType(Types::SMALLFLOAT, SmallFloatType::class);
         Type::overrideType(Types::JSON, JsonType::class);
         Type::overrideType(Types::DECIMAL, DecimalType::class);
 

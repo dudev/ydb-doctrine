@@ -110,6 +110,7 @@ class YdbStatement implements Statement
             YdbTypes::INT16 => $this->typeValue($value, 'INT16')->toTypedValue(),
             YdbTypes::JSON => $this->typeValue($value, 'JSON')->toTypedValue(),
             YdbTypes::FLOAT, YdbTypes::DECIMAL => $this->typeValue($value, 'FLOAT')->toTypedValue(),
+            YdbTypes::DOUBLE => $this->typeValue($value, 'DOUBLE')->toTypedValue(),
             YdbTypes::TIMESTAMP => $this->typeValue($value, 'TIMESTAMP')->toTypedValue(),
             YdbTypes::UINT32 => $this->typeValue($value, 'UINT32')->toTypedValue(),
             YdbTypes::UINT64 => $this->typeValue($value, 'UINT64')->toTypedValue(),
