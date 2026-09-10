@@ -53,41 +53,22 @@ class YdbDriver implements Driver
         Type::overrideType(Types::JSON, JsonType::class);
         Type::overrideType(Types::DECIMAL, DecimalType::class);
 
-        /*
-         * Same wire-type problem as the five overrides above, minus a bespoke
-         * subclass each - see WireTypeDecorator's docblock. These are the
-         * "correctly declared column, silently mis-bound value" cases from
-         * docs/YDB-TYPE-MAPPING.md findings #8/#9 - DATETIME_MUTABLE/
-         * DATETIMETZ_MUTABLE were already covered above, but DATE_MUTABLE
-         * turned out to have the exact same gap (confirmed live, not just in
-         * the doc) despite never being flagged there as broken.
-         */
+        // Same wire-type gap as the five overrides above.
         self::wireType(Types::DATE_MUTABLE, YdbTypes::DATE);
         self::wireType(Types::DATE_IMMUTABLE, YdbTypes::DATE);
         self::wireType(Types::DATETIME_IMMUTABLE, YdbTypes::DATETIME);
         self::wireType(Types::DATETIMETZ_IMMUTABLE, YdbTypes::DATETIME);
         self::wireType(Types::GUID, YdbTypes::UUID);
+        self::wireType(Types::BIGINT, YdbTypes::INT64);
+        self::wireType(Types::SMALLINT, YdbTypes::INT16);
 
-        /*
-         * symfony/uid's own Doctrine type, registered under the name 'uuid'
-         * (not Types::GUID='guid') - optional dependency, only wrap it if
-         * something already registered it (normally DoctrineBridge's bundle
-         * config does this before a Connection is ever opened).
-         */
+        // symfony/uid's own type, registered as 'uuid' (not Types::GUID) - only wrap it if something else already registered it.
         if (Type::hasType('uuid')) {
             self::wireType('uuid', YdbTypes::UUID);
         }
     }
 
-    /**
-     * connect() runs this on every call, but Type's registry is a process-wide
-     * static singleton that outlives any single connection (e.g. across
-     * PHPUnit test methods, each opening its own Connection in the same
-     * process) - re-wrapping an already-wired type here would nest a second
-     * WireTypeDecorator around the first, making convertToDatabaseValue()
-     * return a TypedValue whose ->value is itself a TypedValue instead of a
-     * plain value. Skip types already wired.
-     */
+    /** Type's registry outlives any single connect() call - skip types already wired to avoid double-wrapping. */
     private static function wireType(string $name, string $ydbType): void
     {
         if (Type::getType($name) instanceof WireTypeDecorator) {
