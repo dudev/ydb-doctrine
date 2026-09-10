@@ -21,6 +21,8 @@ final class YdbConnection implements Connection
      */
     private Session $session;
 
+    private bool $inTransaction = false;
+
     public function __construct(
         private Ydb $ydb
     ) {
@@ -61,7 +63,7 @@ final class YdbConnection implements Connection
 
     public function prepare(string $sql): Statement
     {
-        return new YdbStatement($sql, $this->session);
+        return new YdbStatement($sql, $this->session, fn (): bool => $this->inTransaction);
     }
 
     public function query(string $sql): Result
@@ -89,11 +91,13 @@ final class YdbConnection implements Connection
     public function beginTransaction(): void
     {
         $this->session->beginTransaction();
+        $this->inTransaction = true;
     }
 
     public function commit(): void
     {
         $this->session->commit();
+        $this->inTransaction = false;
     }
 
     public function rollBack(): void
@@ -101,6 +105,8 @@ final class YdbConnection implements Connection
         try {
             $this->session->rollBack();
         } catch (\Throwable) {
+        } finally {
+            $this->inTransaction = false;
         }
     }
 
