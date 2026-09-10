@@ -129,6 +129,16 @@ class YdbStatement implements Statement
                 if (!$res instanceof QueryResult) {
                     throw new \Exception('Expected a QueryResult, got: ' . get_debug_type($res));
                 }
+                if ($res->isTruncated()) {
+                    // YDB's Table Service caps a single result set (~1000 rows) and
+                    // signals it via this flag instead of an error - silently
+                    // returning fewer rows than actually match would be silent data
+                    // loss. No fix planned upstream (ydb-platform/ydb-php-sdk#152).
+                    throw new \Exception(
+                        'Result set was truncated by the server (YDB Table Service caps rows per response) - '
+                        . 'add LIMIT/OFFSET pagination to this query, or use scanQuery() for a full unpaginated read.'
+                    );
+                }
 
                 return new YdbResult($res);
             }
