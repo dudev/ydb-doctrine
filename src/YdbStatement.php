@@ -105,6 +105,8 @@ class YdbStatement implements Statement
             )->toTypedValue(),
             YdbTypes::DATE => $this->typeValue($value, 'DATE')->toTypedValue(),
             YdbTypes::UUID => $this->typeValue($value, 'UUID')->toTypedValue(),
+            YdbTypes::INT64 => $this->typeValue($value, 'INT64')->toTypedValue(),
+            YdbTypes::INT16 => $this->typeValue($value, 'INT16')->toTypedValue(),
             YdbTypes::JSON => $this->typeValue($value, 'JSON')->toTypedValue(),
             YdbTypes::FLOAT, YdbTypes::DECIMAL => $this->typeValue($value, 'FLOAT')->toTypedValue(),
             YdbTypes::TIMESTAMP => $this->typeValue($value, 'TIMESTAMP')->toTypedValue(),
