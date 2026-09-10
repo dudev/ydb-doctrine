@@ -6,7 +6,7 @@ use Dudev\YdbDoctrine\Value\TypedValue;
 use Dudev\YdbDoctrine\YdbTypes;
 use Doctrine\DBAL\Platforms\AbstractPlatform;
 
-class FloatType extends \Doctrine\DBAL\Types\FloatType
+class SmallFloatType extends \Doctrine\DBAL\Types\SmallFloatType
 {
     public function convertToDatabaseValue(mixed $value, AbstractPlatform $platform): mixed
     {
@@ -14,6 +14,6 @@ class FloatType extends \Doctrine\DBAL\Types\FloatType
             return $value;
         }
 
-        return new TypedValue((float) $value, YdbTypes::DOUBLE);
+        return new TypedValue((float) $value, YdbTypes::FLOAT);
     }
 }
