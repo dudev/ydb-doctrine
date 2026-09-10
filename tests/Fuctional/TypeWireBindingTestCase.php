@@ -5,21 +5,7 @@ namespace Dudev\YdbDoctrine\Tests\Fuctional;
 use Doctrine\DBAL\Schema\Table;
 use Doctrine\DBAL\Types\Types;
 
-/**
- * docs/YDB-TYPE-MAPPING.md findings #8/#9: Types::DATE_MUTABLE/DATE_IMMUTABLE/
- * DATETIME_IMMUTABLE/DATETIMETZ_IMMUTABLE/GUID used to bind as a bare Utf8
- * string instead of their real YQL wire type - nothing wrapped the value
- * DateType/DateImmutableType/DateTimeImmutableType/DateTimeTzImmutableType/
- * GuidType produce in Value\TypedValue, and YdbStatement::makeYdbType() only
- * recognizes that wrapper (Doctrine's Connection/Statement resolve
- * $type->convertToDatabaseValue()/getBindingType() before ever calling the
- * driver's bindValue(), so the originating Type is the only place left that
- * can attach it). Confirmed live: every INSERT through one of these types
- * failed with a YQL type-annotation error before the fix
- * (Type\WireTypeDecorator, registered in YdbDriver::overrideBaseTypes()).
- * These pin that the INSERT no longer throws and the value round-trips
- * through the wire format QueryResult::fillRows() decodes it back into.
- */
+/** Regression coverage for wire-type binding of date/uuid/bigint/smallint types. */
 class TypeWireBindingTestCase extends AbstractFunctionalCase
 {
     private function createTable(string $name): Table
@@ -31,6 +17,8 @@ class TypeWireBindingTestCase extends AbstractFunctionalCase
         $table->addColumn('dt', Types::DATETIME_IMMUTABLE, ['notnull' => false]);
         $table->addColumn('dttz', Types::DATETIMETZ_IMMUTABLE, ['notnull' => false]);
         $table->addColumn('u', Types::GUID, ['notnull' => false]);
+        $table->addColumn('big', Types::BIGINT, ['notnull' => false]);
+        $table->addColumn('small', Types::SMALLINT, ['notnull' => false]);
         $table->setPrimaryKey(['id']);
 
         return $table;
@@ -138,6 +126,48 @@ class TypeWireBindingTestCase extends AbstractFunctionalCase
             );
         } finally {
             $sm->dropTable('tmp_wire_guid');
+        }
+    }
+
+    public function testBigIntBindsAsInt64(): void
+    {
+        $sm = $this->connection->createSchemaManager();
+        $sm->createTable($this->createTable('tmp_wire_bigint'));
+
+        try {
+            $this->connection->insert(
+                'tmp_wire_bigint',
+                ['id' => 1, 'big' => 9223372036854775807],
+                ['id' => Types::INTEGER, 'big' => Types::BIGINT],
+            );
+
+            $this->assertSame(
+                9223372036854775807,
+                $this->connection->fetchOne('SELECT big FROM tmp_wire_bigint WHERE id = ?', [1], [Types::INTEGER]),
+            );
+        } finally {
+            $sm->dropTable('tmp_wire_bigint');
+        }
+    }
+
+    public function testSmallIntBindsAsInt16(): void
+    {
+        $sm = $this->connection->createSchemaManager();
+        $sm->createTable($this->createTable('tmp_wire_smallint'));
+
+        try {
+            $this->connection->insert(
+                'tmp_wire_smallint',
+                ['id' => 1, 'small' => 12345],
+                ['id' => Types::INTEGER, 'small' => Types::SMALLINT],
+            );
+
+            $this->assertEquals(
+                12345,
+                $this->connection->fetchOne('SELECT small FROM tmp_wire_smallint WHERE id = ?', [1], [Types::INTEGER]),
+            );
+        } finally {
+            $sm->dropTable('tmp_wire_smallint');
         }
     }
 }
