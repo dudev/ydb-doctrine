@@ -17,6 +17,13 @@ use Doctrine\DBAL\Types\Types;
  * can attach it). Confirmed live: every INSERT through one of these types
  * failed with a YQL type-annotation error before the fix
  * (Type\WireTypeDecorator, registered in YdbDriver::overrideBaseTypes()).
+ *
+ * Types::BIGINT/SMALLINT turned out to have the same gap, found by auditing
+ * every MAP_TO_DBAL_TYPES entry's write path instead of assuming DDL-correct
+ * means bind-correct: BigIntType::getBindingType() returns STRING (falls
+ * into YdbStatement's Utf8 fallback), SmallIntType falls into its
+ * ParameterType::INTEGER fallback, hardcoded to 'INT32' - both wrong.
+ *
  * These pin that the INSERT no longer throws and the value round-trips
  * through the wire format QueryResult::fillRows() decodes it back into.
  */
@@ -31,6 +38,8 @@ class TypeWireBindingTestCase extends AbstractFunctionalCase
         $table->addColumn('dt', Types::DATETIME_IMMUTABLE, ['notnull' => false]);
         $table->addColumn('dttz', Types::DATETIMETZ_IMMUTABLE, ['notnull' => false]);
         $table->addColumn('u', Types::GUID, ['notnull' => false]);
+        $table->addColumn('big', Types::BIGINT, ['notnull' => false]);
+        $table->addColumn('small', Types::SMALLINT, ['notnull' => false]);
         $table->setPrimaryKey(['id']);
 
         return $table;
@@ -138,6 +147,48 @@ class TypeWireBindingTestCase extends AbstractFunctionalCase
             );
         } finally {
             $sm->dropTable('tmp_wire_guid');
+        }
+    }
+
+    public function testBigIntBindsAsInt64(): void
+    {
+        $sm = $this->connection->createSchemaManager();
+        $sm->createTable($this->createTable('tmp_wire_bigint'));
+
+        try {
+            $this->connection->insert(
+                'tmp_wire_bigint',
+                ['id' => 1, 'big' => 9223372036854775807],
+                ['id' => Types::INTEGER, 'big' => Types::BIGINT],
+            );
+
+            $this->assertSame(
+                9223372036854775807,
+                $this->connection->fetchOne('SELECT big FROM tmp_wire_bigint WHERE id = ?', [1], [Types::INTEGER]),
+            );
+        } finally {
+            $sm->dropTable('tmp_wire_bigint');
+        }
+    }
+
+    public function testSmallIntBindsAsInt16(): void
+    {
+        $sm = $this->connection->createSchemaManager();
+        $sm->createTable($this->createTable('tmp_wire_smallint'));
+
+        try {
+            $this->connection->insert(
+                'tmp_wire_smallint',
+                ['id' => 1, 'small' => 12345],
+                ['id' => Types::INTEGER, 'small' => Types::SMALLINT],
+            );
+
+            $this->assertEquals(
+                12345,
+                $this->connection->fetchOne('SELECT small FROM tmp_wire_smallint WHERE id = ?', [1], [Types::INTEGER]),
+            );
+        } finally {
+            $sm->dropTable('tmp_wire_smallint');
         }
     }
 }

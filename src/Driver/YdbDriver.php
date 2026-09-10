@@ -69,6 +69,19 @@ class YdbDriver implements Driver
         self::wireType(Types::GUID, YdbTypes::UUID);
 
         /*
+         * Same gap again, found by auditing every MAP_TO_DBAL_TYPES entry's
+         * write path instead of assuming DDL-correct means bind-correct:
+         * BigIntType::getBindingType() returns STRING (not the plain int
+         * fallback), so Types::BIGINT fell into the ParameterType::STRING
+         * branch and bound as Utf8; SmallIntType falls into
+         * ParameterType::INTEGER, which YdbStatement's fallback hardcodes to
+         * 'INT32', not 'INT16'. Types::INTEGER checked too and is fine as-is
+         * - its INTEGER/'INT32' fallback already matches YdbTypes::INTEGER.
+         */
+        self::wireType(Types::BIGINT, YdbTypes::INT64);
+        self::wireType(Types::SMALLINT, YdbTypes::INT16);
+
+        /*
          * symfony/uid's own Doctrine type, registered under the name 'uuid'
          * (not Types::GUID='guid') - optional dependency, only wrap it if
          * something already registered it (normally DoctrineBridge's bundle
