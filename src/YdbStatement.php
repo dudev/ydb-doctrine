@@ -31,6 +31,7 @@ class YdbStatement implements Statement
     public function __construct(
         private string $sql,
         private Session $session,
+        private ?\Closure $isTransactionActive = null,
     ) {
     }
 
@@ -125,7 +126,12 @@ class YdbStatement implements Statement
 
                 return new YdbSchemaResult();
             } else {
-                $res = $this->session->prepare($sql)->execute($this->parameters);
+                $res = ($this->isTransactionActive && ($this->isTransactionActive)())
+                    ? $this->session->prepare($sql)->execute($this->parameters)
+                    : $this->session->newQuery($sql)
+                        ->beginTx('serializable_read_write', true)
+                        ->parameters($this->parameters)
+                        ->execute();
                 if (!$res instanceof QueryResult) {
                     throw new \Exception('Expected a QueryResult, got: ' . get_debug_type($res));
                 }

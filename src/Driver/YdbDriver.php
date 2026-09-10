@@ -62,7 +62,7 @@ class YdbDriver implements Driver
         self::wireType(Types::BIGINT, YdbTypes::INT64);
         self::wireType(Types::SMALLINT, YdbTypes::INT16);
 
-        // symfony/uid's own type, registered as 'uuid' (not Types::GUID) - only wrap it if something else already registered it.
+        // symfony/uid's own type, registered as 'uuid' (not Types::GUID) - only wrap it if already registered.
         if (Type::hasType('uuid')) {
             self::wireType('uuid', YdbTypes::UUID);
         }
