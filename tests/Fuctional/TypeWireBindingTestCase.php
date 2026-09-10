@@ -5,28 +5,7 @@ namespace Dudev\YdbDoctrine\Tests\Fuctional;
 use Doctrine\DBAL\Schema\Table;
 use Doctrine\DBAL\Types\Types;
 
-/**
- * docs/YDB-TYPE-MAPPING.md findings #8/#9: Types::DATE_MUTABLE/DATE_IMMUTABLE/
- * DATETIME_IMMUTABLE/DATETIMETZ_IMMUTABLE/GUID used to bind as a bare Utf8
- * string instead of their real YQL wire type - nothing wrapped the value
- * DateType/DateImmutableType/DateTimeImmutableType/DateTimeTzImmutableType/
- * GuidType produce in Value\TypedValue, and YdbStatement::makeYdbType() only
- * recognizes that wrapper (Doctrine's Connection/Statement resolve
- * $type->convertToDatabaseValue()/getBindingType() before ever calling the
- * driver's bindValue(), so the originating Type is the only place left that
- * can attach it). Confirmed live: every INSERT through one of these types
- * failed with a YQL type-annotation error before the fix
- * (Type\WireTypeDecorator, registered in YdbDriver::overrideBaseTypes()).
- *
- * Types::BIGINT/SMALLINT turned out to have the same gap, found by auditing
- * every MAP_TO_DBAL_TYPES entry's write path instead of assuming DDL-correct
- * means bind-correct: BigIntType::getBindingType() returns STRING (falls
- * into YdbStatement's Utf8 fallback), SmallIntType falls into its
- * ParameterType::INTEGER fallback, hardcoded to 'INT32' - both wrong.
- *
- * These pin that the INSERT no longer throws and the value round-trips
- * through the wire format QueryResult::fillRows() decodes it back into.
- */
+/** Regression coverage for docs/YDB-TYPE-MAPPING.md findings #8-#10 - wire-type binding for date/uuid/bigint/smallint types. */
 class TypeWireBindingTestCase extends AbstractFunctionalCase
 {
     private function createTable(string $name): Table
