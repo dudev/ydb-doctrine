@@ -103,6 +103,8 @@ class YdbStatement implements Statement
                 $value instanceof \DateTimeImmutable ? \DateTime::createFromImmutable($value) : $value,
                 'DATETIME',
             )->toTypedValue(),
+            YdbTypes::DATE => $this->typeValue($value, 'DATE')->toTypedValue(),
+            YdbTypes::UUID => $this->typeValue($value, 'UUID')->toTypedValue(),
             YdbTypes::JSON => $this->typeValue($value, 'JSON')->toTypedValue(),
             YdbTypes::FLOAT, YdbTypes::DECIMAL => $this->typeValue($value, 'FLOAT')->toTypedValue(),
             YdbTypes::TIMESTAMP => $this->typeValue($value, 'TIMESTAMP')->toTypedValue(),
