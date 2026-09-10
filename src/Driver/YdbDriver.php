@@ -53,7 +53,7 @@ class YdbDriver implements Driver
         Type::overrideType(Types::JSON, JsonType::class);
         Type::overrideType(Types::DECIMAL, DecimalType::class);
 
-        // Same wire-type gap as the five overrides above - see docs/YDB-TYPE-MAPPING.md findings #8-#10.
+        // Same wire-type gap as the five overrides above.
         self::wireType(Types::DATE_MUTABLE, YdbTypes::DATE);
         self::wireType(Types::DATE_IMMUTABLE, YdbTypes::DATE);
         self::wireType(Types::DATETIME_IMMUTABLE, YdbTypes::DATETIME);

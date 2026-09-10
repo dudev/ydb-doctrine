@@ -5,7 +5,7 @@ namespace Dudev\YdbDoctrine\Tests\Fuctional;
 use Doctrine\DBAL\Schema\Table;
 use Doctrine\DBAL\Types\Types;
 
-/** Regression coverage for docs/YDB-TYPE-MAPPING.md findings #8-#10 - wire-type binding for date/uuid/bigint/smallint types. */
+/** Regression coverage for wire-type binding of date/uuid/bigint/smallint types. */
 class TypeWireBindingTestCase extends AbstractFunctionalCase
 {
     private function createTable(string $name): Table

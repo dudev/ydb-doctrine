@@ -7,7 +7,7 @@ use Doctrine\DBAL\Platforms\AbstractPlatform;
 use Doctrine\DBAL\Types\Type;
 use Dudev\YdbDoctrine\Value\TypedValue;
 
-/** Wraps a Type so convertToDatabaseValue() tags its result with the YQL wire type YdbStatement needs - see docs/YDB-TYPE-MAPPING.md finding #8. */
+/** Wraps a Type so convertToDatabaseValue() tags its result with the YQL wire type YdbStatement needs to bind it correctly. */
 final class WireTypeDecorator extends Type
 {
     public function __construct(
