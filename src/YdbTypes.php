@@ -23,6 +23,9 @@ final class YdbTypes
     public const UINT64 = 'uint64';
     public const FLOAT = 'float';
     public const DOUBLE = 'double';
+    public const SMALL_SERIAL = 'smallserial';
+    public const SERIAL = 'serial';
+    public const BIG_SERIAL = 'bigserial';
     public const DECIMAL = 'decimal';
     public const STRING = 'string';
     public const UTF8 = 'utf8';
