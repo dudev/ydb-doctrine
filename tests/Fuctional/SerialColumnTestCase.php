@@ -69,6 +69,22 @@ class SerialColumnTestCase extends AbstractFunctionalCase
         }
     }
 
+    public function testLastInsertIdReturnsTheGeneratedValue(): void
+    {
+        $sm = $this->connection->createSchemaManager();
+        $sm->createTable($this->createTable('tmp_serial_last_insert_id', Types::INTEGER));
+
+        try {
+            $this->connection->insert('tmp_serial_last_insert_id', ['v' => 'a'], ['v' => Types::STRING]);
+            $this->assertSame(1, $this->connection->lastInsertId());
+
+            $this->connection->insert('tmp_serial_last_insert_id', ['v' => 'b'], ['v' => Types::STRING]);
+            $this->assertSame(2, $this->connection->lastInsertId());
+        } finally {
+            $sm->dropTable('tmp_serial_last_insert_id');
+        }
+    }
+
     public function testIntrospectionSurfacesAutoincrement(): void
     {
         $sm = $this->connection->createSchemaManager();

@@ -32,6 +32,8 @@ class YdbStatement implements Statement
         private string $sql,
         private Session $session,
         private ?\Closure $isTransactionActive = null,
+        private ?\Closure $findAutoincrementColumn = null,
+        private ?\Closure $onInsertId = null,
     ) {
     }
 
@@ -127,6 +129,11 @@ class YdbStatement implements Statement
 
                 return new YdbSchemaResult();
             } else {
+                $autoincrementColumn = $this->findAutoincrementColumnForInsert($sql);
+                if (null !== $autoincrementColumn) {
+                    $sql .= ' RETURNING ' . $autoincrementColumn;
+                }
+
                 $res = ($this->isTransactionActive && ($this->isTransactionActive)())
                     ? $this->session->prepare($sql)->execute($this->parameters)
                     : $this->session->newQuery($sql)
@@ -147,12 +154,38 @@ class YdbStatement implements Statement
                     );
                 }
 
+                if (null !== $autoincrementColumn) {
+                    $this->captureInsertId($res);
+                }
+
                 return new YdbResult($res);
             }
         } catch (\Throwable $ex) {
             $this->clearDeadTransaction();
 
             throw new \Exception($sql . "\n" . ' Details: ' . $ex->getMessage(), previous: $ex);
+        }
+    }
+
+    /** YDB has no session-level "last generated id" like MySQL - RETURNING on the INSERT itself is the only way to learn it. */
+    private function findAutoincrementColumnForInsert(string $sql): ?string
+    {
+        if (!$this->findAutoincrementColumn || str_contains($sql, 'RETURNING')) {
+            return null;
+        }
+
+        if (!preg_match('/INSERT INTO\s+`?([^\s`(]+)`?/i', $sql, $matches)) {
+            return null;
+        }
+
+        return ($this->findAutoincrementColumn)($matches[1]);
+    }
+
+    private function captureInsertId(QueryResult $res): void
+    {
+        $row = $res->rows()[0] ?? null;
+        if ($this->onInsertId && null !== $row) {
+            ($this->onInsertId)(reset($row));
         }
     }
 
