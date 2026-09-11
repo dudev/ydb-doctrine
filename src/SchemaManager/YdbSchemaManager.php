@@ -60,7 +60,10 @@ class YdbSchemaManager extends AbstractSchemaManager
 
             $wireType = $item['typeId']
                 ?? throw new \Exception("YDB: unrecognized column type for '{$column['name']}'");
-            $list[$column['name']] = new Column($column['name'], $this->bindType($wireType), ['notnull' => $notnull]);
+            $list[$column['name']] = new Column($column['name'], $this->bindType($wireType), [
+                'notnull' => $notnull,
+                'autoincrement' => isset($column['fromSequence']),
+            ]);
         }
 
         return $list;

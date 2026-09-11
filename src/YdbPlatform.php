@@ -132,6 +132,11 @@ final class YdbPlatform extends AbstractPlatform
         return false;
     }
 
+    public function supportsIdentityColumns(): bool
+    {
+        return true;
+    }
+
     public function convertBooleans($item): mixed
     {
         if (is_array($item)) {
@@ -184,17 +189,17 @@ final class YdbPlatform extends AbstractPlatform
 
     public function getIntegerTypeDeclarationSQL(array $column): string
     {
-        return YdbTypes::INTEGER;
+        return empty($column['autoincrement']) ? YdbTypes::INTEGER : YdbTypes::SERIAL;
     }
 
     public function getBigIntTypeDeclarationSQL(array $column): string
     {
-        return YdbTypes::BIG_INT;
+        return empty($column['autoincrement']) ? YdbTypes::BIG_INT : YdbTypes::BIG_SERIAL;
     }
 
     public function getSmallIntTypeDeclarationSQL(array $column): string
     {
-        return YdbTypes::SMALL_INT;
+        return empty($column['autoincrement']) ? YdbTypes::SMALL_INT : YdbTypes::SMALL_SERIAL;
     }
 
     // phpcs:ignore PSR2.Methods.MethodDeclaration.Underscore -- overrides AbstractPlatform's own underscore-prefixed name, can't rename
