@@ -1,5 +1,6 @@
 user.json
 vendor
+.composer-cache
 test.php
 .idea
 .phpunit.result.cache
