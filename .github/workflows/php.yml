@@ -5,30 +5,49 @@ on:
   pull_request:
 
 jobs:
-  test:
-    name: PHPStan / PHPCS / PHPUnit
+  quality:
+    name: ${{ matrix.name }}
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: PHPStan
+            run: vendor/bin/phpstan analyse --no-progress --memory-limit=512M
+          - name: PHPCS
+            run: vendor/bin/phpcs
+          - name: PHPUnit
+            run: vendor/bin/phpunit
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # Builds and runs against the same docker-compose.yml (PHP 8.2 + grpc, YDB
-      # with enable_views on) used for local development, so CI can't drift from
-      # what was actually verified by hand - a plain PHP-setup-action + a bare
-      # YDB services: container (the old setup) can't enable feature flags on the
-      # YDB image and had drifted to PHP 8.1, which doctrine/dbal ^4.4 no longer
-      # supports.
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Same image (PHP 8.2 + grpc, built from docker/php/Dockerfile) each
+      # matrix job builds independently - self-contained, no registry to push
+      # to or pull from. GHA's cache backend makes this fast once warm: only
+      # the very first run after a Dockerfile change pays the full grpc
+      # compile in all three jobs at once, every run after that hits cache.
       - name: Build PHP image
-        run: docker compose build php
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/php/Dockerfile
+          tags: ydb-doctrine-php:local
+          load: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Cache Composer packages
+        uses: actions/cache@v4
+        with:
+          path: .composer-cache
+          key: composer-${{ hashFiles('composer.lock') }}
 
       - name: Install Composer dependencies
-        run: docker compose run --rm php composer install -o --no-progress
+        run: docker compose run --rm -e COMPOSER_CACHE_DIR=/app/.composer-cache php composer install -o --no-progress
 
-      - name: PHPStan
-        run: docker compose run --rm php vendor/bin/phpstan analyse --no-progress --memory-limit=512M
-
-      - name: PHPCS
-        run: docker compose run --rm php vendor/bin/phpcs
-
-      - name: PHPUnit
-        run: docker compose run --rm php vendor/bin/phpunit
+      - name: ${{ matrix.name }}
+        run: docker compose run --rm php ${{ matrix.run }}
