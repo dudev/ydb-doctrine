@@ -85,6 +85,32 @@ class SerialColumnTestCase extends AbstractFunctionalCase
         }
     }
 
+    public function testCompositeSerialPrimaryKeyStillGeneratesBothValues(): void
+    {
+        $table = new Table('tmp_serial_composite');
+        $table->addColumn('a', Types::INTEGER, ['autoincrement' => true]);
+        $table->addColumn('b', Types::INTEGER, ['autoincrement' => true]);
+        $table->addColumn('v', Types::STRING, ['notnull' => false]);
+        $table->setPrimaryKey(['a', 'b']);
+
+        $sm = $this->connection->createSchemaManager();
+        $sm->createTable($table);
+
+        try {
+            $this->connection->insert('tmp_serial_composite', ['v' => 'x'], ['v' => Types::STRING]);
+
+            $this->assertSame(
+                ['a' => 1, 'b' => 1, 'v' => 'x'],
+                $this->connection->fetchAssociative('SELECT a, b, v FROM tmp_serial_composite'),
+            );
+
+            $this->expectException(\Exception::class);
+            $this->connection->lastInsertId();
+        } finally {
+            $sm->dropTable('tmp_serial_composite');
+        }
+    }
+
     public function testIntrospectionSurfacesAutoincrement(): void
     {
         $sm = $this->connection->createSchemaManager();
