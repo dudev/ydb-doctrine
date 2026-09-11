@@ -24,6 +24,8 @@ services:
       "
 
   php:
+    # Explicit tag so CI can build it with buildx (GHA cache) and reuse it here without a rebuild.
+    image: ydb-doctrine-php:local
     build:
       context: .
       dockerfile: docker/php/Dockerfile
