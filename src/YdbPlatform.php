@@ -132,6 +132,11 @@ final class YdbPlatform extends AbstractPlatform
         return false;
     }
 
+    public function supportsIdentityColumns(): bool
+    {
+        return true;
+    }
+
     public function convertBooleans($item): mixed
     {
         if (is_array($item)) {
