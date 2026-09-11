@@ -23,6 +23,11 @@ final class YdbConnection implements Connection
 
     private bool $inTransaction = false;
 
+    /** @var array<string, string|null> table name -> autoincrement column name, cached per table for this connection's lifetime. */
+    private array $autoincrementColumns = [];
+
+    private int|string|null $lastInsertId = null;
+
     public function __construct(
         private Ydb $ydb
     ) {
@@ -63,7 +68,30 @@ final class YdbConnection implements Connection
 
     public function prepare(string $sql): Statement
     {
-        return new YdbStatement($sql, $this->session, fn (): bool => $this->inTransaction);
+        return new YdbStatement(
+            $sql,
+            $this->session,
+            fn (): bool => $this->inTransaction,
+            fn (string $table): ?string => $this->findAutoincrementColumn($table),
+            function (int|string $id): void {
+                $this->lastInsertId = $id;
+            },
+        );
+    }
+
+    private function findAutoincrementColumn(string $table): ?string
+    {
+        if (!array_key_exists($table, $this->autoincrementColumns)) {
+            $this->autoincrementColumns[$table] = null;
+            foreach ($this->session->describeTable($table)['columns'] ?? [] as $column) {
+                if (isset($column['fromSequence'])) {
+                    $this->autoincrementColumns[$table] = $column['name'];
+                    break;
+                }
+            }
+        }
+
+        return $this->autoincrementColumns[$table];
     }
 
     public function query(string $sql): Result
@@ -85,7 +113,8 @@ final class YdbConnection implements Connection
 
     public function lastInsertId(): int|string
     {
-        throw new \Exception();
+        return $this->lastInsertId
+            ?? throw new \Exception('No autoincrement value has been generated on this connection yet.');
     }
 
     public function beginTransaction(): void
