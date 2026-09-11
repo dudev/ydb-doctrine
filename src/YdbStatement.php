@@ -155,7 +155,7 @@ class YdbStatement implements Statement
                 }
 
                 if (null !== $autoincrementColumn) {
-                    $this->captureInsertId($res);
+                    $this->captureInsertId($res, $autoincrementColumn);
                 }
 
                 return new YdbResult($res);
@@ -181,11 +181,11 @@ class YdbStatement implements Statement
         return ($this->findAutoincrementColumn)($matches[1]);
     }
 
-    private function captureInsertId(QueryResult $res): void
+    private function captureInsertId(QueryResult $res, string $column): void
     {
         $row = $res->rows()[0] ?? null;
-        if ($this->onInsertId && null !== $row) {
-            ($this->onInsertId)(reset($row));
+        if ($this->onInsertId && null !== $row && array_key_exists($column, $row)) {
+            ($this->onInsertId)($row[$column]);
         }
     }
 
