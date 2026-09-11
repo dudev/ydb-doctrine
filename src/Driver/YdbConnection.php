@@ -79,16 +79,18 @@ final class YdbConnection implements Connection
         );
     }
 
+    /** Null when there's no autoincrement column, or more than one (YDB allows a composite Serial PK; lastInsertId() can't report two values). */
     private function findAutoincrementColumn(string $table): ?string
     {
         if (!array_key_exists($table, $this->autoincrementColumns)) {
-            $this->autoincrementColumns[$table] = null;
+            $found = [];
             foreach ($this->session->describeTable($table)['columns'] ?? [] as $column) {
                 if (isset($column['fromSequence'])) {
-                    $this->autoincrementColumns[$table] = $column['name'];
-                    break;
+                    $found[] = $column['name'];
                 }
             }
+
+            $this->autoincrementColumns[$table] = 1 === count($found) ? $found[0] : null;
         }
 
         return $this->autoincrementColumns[$table];
