@@ -24,6 +24,6 @@ trait EntityManagerFactoryTrait
         $configuration->setProxyDir(__DIR__ . '/App');
         $configuration->setProxyNamespace('App');
 
-        return new EntityManager($connect, $configuration);
+        return EntityManager::create($connect, $configuration);
     }
 }
