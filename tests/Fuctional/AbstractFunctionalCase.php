@@ -45,7 +45,7 @@ abstract class AbstractFunctionalCase extends TestCase
             isDevMode: true,
         );
 
-        return new EntityManager($this->connection, $config);
+        return EntityManager::create($this->connection, $config);
     }
 
     /** @param list<class-string> $entityClasses */
