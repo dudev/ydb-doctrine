@@ -9,13 +9,7 @@ use Doctrine\DBAL\DriverManager;
 use Doctrine\DBAL\ParameterType;
 
 /**
- * Никакого instanceof-guard на $driver (был раньше) — DoctrineBundle оборачивает драйвер в
- * Middleware (логирование/debug-профилирование/idle-connection и т. п., см.
- * DoctrineExtension::registerDbalMiddlewares()) ещё до создания Connection, так что сюда почти
- * всегда попадает не сам YdbDriver, а декоратор поверх него. Строгая проверка ловила это как
- * ошибку конфигурации и ломала любое подключение с хотя бы одним включённым middleware —
- * в том числе просто dev-окружение с debug: true, где DoctrineBundle включает debug-middleware
- * по умолчанию.
+ * No instanceof(YdbDriver) guard here - DoctrineBundle wraps $driver in middleware before construction.
  *
  * @phpstan-import-type Params from DriverManager
  */
