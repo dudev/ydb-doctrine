@@ -23,15 +23,15 @@
     "repositories": [
         {
             "type": "vcs",
-            "url": "https://github.com/dudev/ydb-php-sdk"
+            "url": "https://github.com/dudev/ydb-php-sdk",
+            "no-api": true
         }
     ],
     "require": {
         "php": "^8.2",
         "doctrine/dbal": "^4.4",
         "doctrine/orm": "^3.4,<3.6",
-        "ydb-platform/ydb-php-sdk": "dev-dev",
-        "symfony/cache": "^6.3"
+        "ydb-platform/ydb-php-sdk": "dev-dev"
     },
     "require-dev": {
         "symfony/var-dumper": "^6.1",
