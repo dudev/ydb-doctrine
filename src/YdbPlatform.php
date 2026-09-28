@@ -16,6 +16,19 @@ use YdbPlatform\Ydb\Ydb;
 
 final class YdbPlatform extends AbstractPlatform
 {
+    /**
+     * YQL quotes identifiers with backticks, not the ANSI-SQL/Postgres double quote
+     * AbstractPlatform defaults to - confirmed live: a quoted identifier reaching the server
+     * as `"..."` is a *string literal* in YQL, not an identifier, and fails DDL with a parser
+     * error ("String literal can not be used here"), not a quoting-specific complaint.
+     */
+    public function quoteSingleIdentifier(string $str): string
+    {
+        // C-style escaping inside backtick-quoted IDs (YQL's own lexer docs), not SQL-style
+        // quote-doubling.
+        return '`' . str_replace('`', '\\`', $str) . '`';
+    }
+
     public function getDecimalTypeDeclarationSQL(array $column): string
     {
         return 'decimal';
