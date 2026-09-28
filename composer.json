@@ -34,6 +34,7 @@
         "ydb-platform/ydb-php-sdk": "dev-dev"
     },
     "require-dev": {
+        "symfony/cache": "^6.4|^7.0",
         "symfony/var-dumper": "^6.1",
         "phpunit/phpunit": "^9.5",
         "friendsofphp/php-cs-fixer": "^v3.0.0",
