@@ -23,9 +23,6 @@ DATABASE_URL="ydb://ydb.serverless.yandexcloud.net:2135/ru-central1/<folder-id>/
 ### Symfony
 
 ```yaml
-parameters:
-  doctrine.orm.entity_manager.class: Dudev\YdbDoctrine\ORM\EntityManager
-
 doctrine:
     dbal:
         options:
@@ -37,7 +34,19 @@ doctrine:
         dql:
             string_functions:
                 rand: Dudev\YdbDoctrine\ORM\Functions\Rand
+
+services:
+    # Decorates the entity manager DoctrineBundle builds instead of replacing its class -
+    # there's no "entity manager class" config key in current DoctrineBundle versions
+    # (`doctrine.orm.entity_manager.abstract`'s class is hardcoded), so this is the only
+    # supported way to get the FK-integrity listener and the custom output walker wired in.
+    Dudev\YdbDoctrine\ORM\EntityManager:
+        decorates: doctrine.orm.default_entity_manager
+        arguments: ['@.inner']
 ```
+
+(If you named your entity manager something other than the default, decorate
+`doctrine.orm.<name>_entity_manager` instead.)
 
 ## Creating tables
 
