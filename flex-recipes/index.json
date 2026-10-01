@@ -1,6 +1,6 @@
 {
     "recipes": {
-        "dudev/ydb-doctrine": ["dev-master"]
+        "dudev/ydb-doctrine": ["master"]
     },
     "branch": "master",
     "is_contrib": false,

@@ -1,7 +1,11 @@
 {
     "manifests": {
         "dudev/ydb-doctrine": {
-            "manifest": {},
+            "manifest": {
+                "copy-from-recipe": {
+                    "config/": "%CONFIG_DIR%/"
+                }
+            },
             "files": {
                 "config/packages/ydb_doctrine.yaml": {
                     "contents": [
@@ -24,7 +28,7 @@
                     "executable": false
                 }
             },
-            "ref": "4c86b8bf4f92002918d49ce560ec9285ff1af864"
+            "ref": "51d93ffaf2616598ea5d9a8875b0e63ac6f1ee5c"
         }
     }
 }
