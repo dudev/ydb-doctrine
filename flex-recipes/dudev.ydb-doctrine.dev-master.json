@@ -1,0 +1,30 @@
+{
+    "manifests": {
+        "dudev/ydb-doctrine": {
+            "manifest": {},
+            "files": {
+                "config/packages/ydb_doctrine.yaml": {
+                    "contents": [
+                        "doctrine:",
+                        "    dbal:",
+                        "        driver_schemes:",
+                        "            ydb: Dudev\\YdbDoctrine\\Driver\\YdbDriver",
+                        "        wrapper_class: Dudev\\YdbDoctrine\\YdbConnection",
+                        "    orm:",
+                        "        dql:",
+                        "            string_functions:",
+                        "                rand: Dudev\\YdbDoctrine\\ORM\\Functions\\Rand",
+                        "",
+                        "services:",
+                        "    Dudev\\YdbDoctrine\\ORM\\EntityManager:",
+                        "        decorates: doctrine.orm.default_entity_manager",
+                        "        arguments: ['@.inner']",
+                        ""
+                    ],
+                    "executable": false
+                }
+            },
+            "ref": "4c86b8bf4f92002918d49ce560ec9285ff1af864"
+        }
+    }
+}

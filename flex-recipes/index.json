@@ -1,0 +1,12 @@
+{
+    "recipes": {
+        "dudev/ydb-doctrine": ["dev-master"]
+    },
+    "branch": "master",
+    "is_contrib": false,
+    "_links": {
+        "repository": "github.com/dudev/ydb-doctrine",
+        "origin_template": "{package}:{version}@github.com/dudev/ydb-doctrine:master",
+        "recipe_template": "https://api.github.com/repos/dudev/ydb-doctrine/contents/flex-recipes/{package_dotted}.{version}.json"
+    }
+}
