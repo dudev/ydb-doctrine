@@ -53,6 +53,27 @@ it to this driver - without it, DBAL's own DSN parser doesn't know the scheme an
 with "Unknown driver" before `driver_class` would ever get a chance to apply (`driver_class`
 alone only takes effect for a schemeless `dbal.url`, which `DATABASE_URL` normally isn't).
 
+#### Symfony Flex
+
+To skip copying the YAML above by hand, point your app at this repo's private Flex
+recipe instead - add to your app's own `composer.json`:
+
+```json
+"extra": {
+    "symfony": {
+        "endpoint": [
+            "https://api.github.com/repos/dudev/ydb-doctrine/contents/flex-recipes/index.json",
+            "flex://defaults"
+        ]
+    }
+}
+```
+
+Then `composer require dudev/ydb-doctrine:dev-master` writes `config/packages/ydb_doctrine.yaml`
+with the block above automatically. This is a private recipe repo you opt into, not a bundle
+baked into this package's own dependencies - Doctrine is commonly used outside Symfony too, so
+this stays optional rather than adding a hard `symfony/*` requirement here.
+
 ## Creating tables
 
 Through the DBAL schema manager directly:
