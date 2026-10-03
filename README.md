@@ -10,7 +10,7 @@ composer require dudev/ydb-doctrine:dev-master
 
 ## Connecting
 
-The connection string is a custom `url` DSN, passed either directly or via `driverOptions.url`:
+The connection string is a `ydb://` DSN, passed as `url` (or, in Symfony, as `dbal.url` - see below):
 
 ```bash
 # Anonymous access - used for local development against a Docker YDB instance.
@@ -25,11 +25,10 @@ DATABASE_URL="ydb://ydb.serverless.yandexcloud.net:2135/ru-central1/<folder-id>/
 ```yaml
 doctrine:
     dbal:
-        options:
-            url: '%env(resolve:DATABASE_URL)%'
-        driver_class: Dudev\YdbDoctrine\Driver\YdbDriver
+        url: '%env(resolve:DATABASE_URL)%'
+        driver_schemes:
+            ydb: Dudev\YdbDoctrine\Driver\YdbDriver
         wrapper_class: Dudev\YdbDoctrine\YdbConnection
-        server_version: 1.4
     orm:
         dql:
             string_functions:
@@ -47,6 +46,11 @@ services:
 
 (If you named your entity manager something other than the default, decorate
 `doctrine.orm.<name>_entity_manager` instead.)
+
+`driver_schemes` is what makes DoctrineBundle recognize the `ydb://` URL scheme and route
+it to this driver - without it, DBAL's own DSN parser doesn't know the scheme and fails
+with "Unknown driver" before `driver_class` would ever get a chance to apply (`driver_class`
+alone only takes effect for a schemeless `dbal.url`, which `DATABASE_URL` normally isn't).
 
 ## Creating tables
 
