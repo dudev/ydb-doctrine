@@ -23,8 +23,7 @@
     "repositories": [
         {
             "type": "vcs",
-            "url": "https://github.com/dudev/ydb-php-sdk",
-            "no-api": true
+            "url": "https://github.com/dudev/ydb-php-sdk"
         }
     ],
     "require": {
