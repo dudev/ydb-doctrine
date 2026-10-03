@@ -2,23 +2,22 @@
 
 namespace Dudev\YdbDoctrine;
 
-use Dudev\YdbDoctrine\Driver\YdbDriver;
 use Doctrine\DBAL\Configuration;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Driver;
 use Doctrine\DBAL\DriverManager;
 use Doctrine\DBAL\ParameterType;
 
-/** @phpstan-import-type Params from DriverManager */
+/**
+ * No instanceof(YdbDriver) guard here - DoctrineBundle wraps $driver in middleware before construction.
+ *
+ * @phpstan-import-type Params from DriverManager
+ */
 final class YdbConnection extends Connection
 {
     /** @param Params $params */
     public function __construct(#[\SensitiveParameter] array $params, Driver $driver, ?Configuration $config = null)
     {
-        if (! $driver instanceof YdbDriver) {
-            throw new \InvalidArgumentException('The driver must be an instance of YdbDriver');
-        }
-
         parent::__construct($params, $driver, $config);
     }
 

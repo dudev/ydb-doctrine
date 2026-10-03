@@ -50,10 +50,13 @@ final class YdbConnection implements Connection
 
     public static function makeConnectionByUrl(string $dbUri, LoggerInterface $logger = null): YdbConnection
     {
-        $config = (new YdbUriParser())->parse($dbUri);
-        $ydb = new Ydb($config, $logger);
+        return self::makeConnectionByConfig((new YdbUriParser())->parse($dbUri), $logger);
+    }
 
-        return new YdbConnection($ydb);
+    /** @param array<string, mixed> $config Shape the SDK's Ydb class itself expects (database/endpoint/discovery/...). */
+    public static function makeConnectionByConfig(array $config, LoggerInterface $logger = null): YdbConnection
+    {
+        return new YdbConnection(new Ydb($config, $logger));
     }
 
     public function getYdb(): Ydb
