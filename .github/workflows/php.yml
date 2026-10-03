@@ -44,10 +44,15 @@ jobs:
         uses: actions/cache@v4
         with:
           path: .composer-cache
-          key: composer-${{ hashFiles('composer.lock') }}
+          key: composer-${{ hashFiles('composer.json') }}
 
+      # No lock file (this is a library): resolve fresh within composer.json's constraints, like a
+      # consumer would. The token keeps the fork's VCS repository from burning the anonymous
+      # GitHub API limit (a cold resolve is ~40 requests, three jobs run it).
       - name: Install Composer dependencies
-        run: docker compose run --rm -e COMPOSER_CACHE_DIR=/app/.composer-cache php composer install -o --no-progress
+        env:
+          COMPOSER_AUTH: '{"github-oauth":{"github.com":"${{ secrets.GITHUB_TOKEN }}"}}'
+        run: docker compose run --rm -e COMPOSER_CACHE_DIR=/app/.composer-cache -e COMPOSER_AUTH php composer update -o --no-progress
 
       - name: ${{ matrix.name }}
         run: docker compose run --rm php ${{ matrix.run }}

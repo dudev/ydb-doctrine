@@ -30,10 +30,10 @@
         "php": "^8.2",
         "doctrine/dbal": "^4.4",
         "doctrine/orm": "^3.4,<3.6",
-        "ydb-platform/ydb-php-sdk": "dev-dev",
-        "symfony/cache": "^6.3"
+        "ydb-platform/ydb-php-sdk": "dev-dev"
     },
     "require-dev": {
+        "symfony/cache": "^6.4|^7.0",
         "symfony/var-dumper": "^6.1",
         "phpunit/phpunit": "^9.5",
         "friendsofphp/php-cs-fixer": "^v3.0.0",
