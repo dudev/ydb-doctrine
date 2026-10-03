@@ -22,38 +22,35 @@ DATABASE_URL="ydb://ydb.serverless.yandexcloud.net:2135/ru-central1/<folder-id>/
 
 ### Symfony
 
-The package ships `Dudev\YdbDoctrine\YdbDoctrineBundle`. With Symfony Flex it is added to
-`config/bundles.php` by `composer require` on its own; without Flex, add it by hand:
-
-```php
-Dudev\YdbDoctrine\YdbDoctrineBundle::class => ['all' => true],
-```
-
-The bundle registers the `ydb://` scheme in DoctrineBundle's `dbal.driver_schemes` (without it
-DBAL's DSN parser fails with "Unknown driver" before any `driver_class` could apply) and
-decorates the entity manager so the FK-integrity listener and the custom output walker get wired
-in (`doctrine.orm.entity_manager.abstract`'s class is hardcoded, so decoration is the only way).
-
-What stays in your own config is what is specific to your connection:
-
 ```yaml
 doctrine:
     dbal:
         url: '%env(resolve:DATABASE_URL)%'
+        driver_schemes:
+            ydb: Dudev\YdbDoctrine\Driver\YdbDriver
         wrapper_class: Dudev\YdbDoctrine\YdbConnection
     orm:
         dql:
             string_functions:
                 rand: Dudev\YdbDoctrine\ORM\Functions\Rand
+
+services:
+    # Decorates the entity manager DoctrineBundle builds instead of replacing its class -
+    # there's no "entity manager class" config key in current DoctrineBundle versions
+    # (`doctrine.orm.entity_manager.abstract`'s class is hardcoded), so this is the only
+    # supported way to get the FK-integrity listener and the custom output walker wired in.
+    Dudev\YdbDoctrine\ORM\EntityManager:
+        decorates: doctrine.orm.default_entity_manager
+        arguments: ['@.inner']
 ```
 
-The decorated entity manager is `default`. If YDB lives in another one, or `default` is a different
-database (the decorator is YDB-specific and should not wrap, say, a Postgres manager), say so:
+(If you named your entity manager something other than the default, decorate
+`doctrine.orm.<name>_entity_manager` instead.)
 
-```yaml
-ydb_doctrine:
-    entity_manager: ydb   # doctrine.orm.ydb_entity_manager; null to decorate nothing
-```
+`driver_schemes` is what makes DoctrineBundle recognize the `ydb://` URL scheme and route
+it to this driver - without it, DBAL's own DSN parser doesn't know the scheme and fails
+with "Unknown driver" before `driver_class` would ever get a chance to apply (`driver_class`
+alone only takes effect for a schemeless `dbal.url`, which `DATABASE_URL` normally isn't).
 
 ## Creating tables
 
