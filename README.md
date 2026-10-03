@@ -41,7 +41,6 @@ doctrine:
     dbal:
         url: '%env(resolve:DATABASE_URL)%'
         wrapper_class: Dudev\YdbDoctrine\YdbConnection
-        server_version: 1.4
     orm:
         dql:
             string_functions:
