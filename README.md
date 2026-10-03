@@ -10,7 +10,7 @@ composer require dudev/ydb-doctrine:dev-master
 
 ## Connecting
 
-The connection string is a custom `url` DSN, passed either directly or via `driverOptions.url`:
+The connection string is a `ydb://` DSN, passed as `url` (or, in Symfony, as `dbal.url` - see below):
 
 ```bash
 # Anonymous access - used for local development against a Docker YDB instance.

@@ -30,21 +30,17 @@ class YdbDriver implements Driver
     }
 
     /**
-     * @param array{url?: string, driverOptions?: array{url?: string}, host?: string,
-     *        port?: int, dbname?: string} $params
-     *        Either this driver's own 'url'/'driverOptions.url' convention (a single DSN
-     *        string - still what direct DriverManager/test usage passes), or DBAL's standard
-     *        decomposed shape (host/port/dbname, plus whatever the DSN's query string
-     *        contained, merged flat - see DsnParser::parseDatabaseUrlQuery()). The latter is
-     *        what reaches here once Symfony's dbal.driver_schemes maps "ydb" to this class
-     *        (see README): that's what makes DoctrineBundle parse the DSN itself instead of
-     *        leaving it untouched for this driver to parse on its own.
+     * @param array{url?: string, host?: string, port?: int, dbname?: string} $params
+     *        Either a raw DSN in 'url' (bare DriverManager usage, which doesn't parse it), or
+     *        DBAL's decomposed shape: host/port/dbname plus the DSN's query-string keys merged
+     *        flat. The latter is what DoctrineBundle passes once dbal.driver_schemes maps
+     *        "ydb" to this class (see README).
      */
     public function connect(array $params): DriverConnection
     {
         $this->overrideBaseTypes();
 
-        $dbUri = $params['url'] ?? $params['driverOptions']['url'] ?? null;
+        $dbUri = $params['url'] ?? null;
 
         return null !== $dbUri
             ? YdbConnection::makeConnectionByUrl($dbUri, $this->logger)
@@ -62,7 +58,7 @@ class YdbDriver implements Driver
      */
     private static function configFromDbalParams(array $params): array
     {
-        $endpoint = ($params['host'] ?? throw new \Exception())
+        $endpoint = ($params['host'] ?? throw new \Exception('YDB connection params need a "host" (or a "url" DSN).'))
             . (isset($params['port']) ? ':' . $params['port'] : '');
 
         // Anything DBAL itself didn't put here came from the DSN's own query string
@@ -83,12 +79,7 @@ class YdbDriver implements Driver
         ] + $extra;
     }
 
-    /**
-     * Every key DBAL's DriverManager itself ever puts in $params (its own Params phpstan
-     * type), plus 'url' (DoctrineBundle's own DSN-convention key, already consumed above by
-     * the time this runs for a bare DriverManager/test call that passes it directly) - not
-     * from a DSN's own query string, so excluded from the pass-through "extra" config above.
-     */
+    /** Keys of DBAL's own Params phpstan type - not from a DSN's query string, so not passed to the SDK. */
     private const DBAL_RESERVED_PARAMS = [
         'application_name', 'charset', 'connectstring', 'dbname', 'defaultTableOptions',
         'driver', 'driverClass', 'driverOptions', 'gssencmode', 'host', 'instancename',
@@ -96,7 +87,6 @@ class YdbDriver implements Driver
         'primary', 'replica', 'serverVersion', 'service', 'servicename', 'sessionMode',
         'sid', 'ssl_ca', 'ssl_capath', 'ssl_cert', 'ssl_cipher', 'ssl_key', 'sslcert',
         'sslcrl', 'sslkey', 'sslmode', 'sslrootcert', 'unix_socket', 'user', 'wrapperClass',
-        'url',
     ];
 
     public function setLogger(?LoggerInterface $logger): void
