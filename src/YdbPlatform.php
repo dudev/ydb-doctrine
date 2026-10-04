@@ -3,12 +3,16 @@
 namespace Dudev\YdbDoctrine;
 
 use Dudev\YdbDoctrine\Platform\Keywords;
+use Dudev\YdbDoctrine\Platform\UnsupportedSchemaChange;
 use Dudev\YdbDoctrine\SchemaManager\YdbSchemaManager;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Platforms\AbstractPlatform;
 use Doctrine\DBAL\Platforms\DateIntervalUnit;
 use Doctrine\DBAL\Platforms\Keywords\KeywordList;
+use Doctrine\DBAL\Schema\Column;
+use Doctrine\DBAL\Schema\ColumnDiff;
 use Doctrine\DBAL\Schema\Index;
+use Doctrine\DBAL\Schema\Name\UnquotedIdentifierFolding;
 use Doctrine\DBAL\Schema\Table;
 use Doctrine\DBAL\Schema\TableDiff;
 use Doctrine\DBAL\TransactionIsolationLevel;
@@ -16,6 +20,12 @@ use YdbPlatform\Ydb\Ydb;
 
 final class YdbPlatform extends AbstractPlatform
 {
+    public function __construct()
+    {
+        // YQL identifiers are case-sensitive: folding to upper case turned `idx_b` into `IDX_B` in RENAME INDEX.
+        parent::__construct(UnquotedIdentifierFolding::NONE);
+    }
+
     /**
      * YQL quotes identifiers with backticks, not the ANSI-SQL/Postgres double quote
      * AbstractPlatform defaults to - confirmed live: a quoted identifier reaching the server
@@ -69,9 +79,135 @@ final class YdbPlatform extends AbstractPlatform
         return YdbTypes::JSON;
     }
 
+    /**
+     * One ALTER TABLE per change, ordered so an index is gone before its column is. What YDB can do:
+     * ADD/DROP COLUMN (non-key), DROP NOT NULL, ADD/DROP/RENAME INDEX. Everything else it rejects
+     * (key, type, rename, SET NOT NULL, a serial column) throws instead of silently doing nothing.
+     * Foreign keys, defaults, lengths and comments are not modelled, same as in CREATE TABLE.
+     */
     public function getAlterTableSQL(TableDiff $diff): array
     {
-        return [];
+        $table = $diff->getOldTable();
+        $alter = 'ALTER TABLE ' . $table->getQuotedName($this) . ' ';
+        $keyColumns = array_map('strtolower', $table->getPrimaryKey()?->getColumns() ?? []);
+
+        foreach ([...$diff->getDroppedIndexes(), ...$diff->getAddedIndexes()] as $index) {
+            if ($index->isPrimary()) {
+                throw new UnsupportedSchemaChange(
+                    "{$table->getName()}: YDB cannot change the primary key of an existing table."
+                );
+            }
+        }
+
+        $sql = [];
+        foreach ($diff->getDroppedIndexes() as $index) {
+            $sql[] = $alter . 'DROP INDEX ' . $index->getQuotedName($this);
+        }
+        foreach ($diff->getIndexRenames() as $rename) {
+            $sql[] = $alter . 'RENAME INDEX ' . $rename->getOldName()->toSQL($this)
+                . ' TO ' . $rename->getNewIndex()->getQuotedName($this);
+        }
+        foreach ($diff->getDroppedColumns() as $column) {
+            if (in_array(strtolower($column->getName()), $keyColumns, true)) {
+                throw new UnsupportedSchemaChange(
+                    "{$table->getName()}.{$column->getName()}: YDB cannot drop a primary key column."
+                );
+            }
+            $sql[] = $alter . 'DROP COLUMN ' . $column->getQuotedName($this);
+        }
+        foreach ($diff->getChangedColumns() as $columnDiff) {
+            $sql = [...$sql, ...$this->getAlterColumnSQL($alter, $table->getName(), $columnDiff)];
+        }
+        foreach ($diff->getAddedColumns() as $column) {
+            $sql[] = $alter . 'ADD COLUMN ' . $this->getAddColumnDeclarationSQL($table->getName(), $column);
+        }
+        foreach ($diff->getAddedIndexes() as $index) {
+            $sql[] = $alter . 'ADD ' . $this->getIndexDeclarationSQL($index);
+        }
+
+        return $sql;
+    }
+
+    /** @return list<string> */
+    private function getAlterColumnSQL(string $alter, string $tableName, ColumnDiff $diff): array
+    {
+        $old = $diff->getOldColumn();
+        $new = $diff->getNewColumn();
+        $name = "$tableName.{$old->getName()}";
+
+        if ($diff->hasNameChanged()) {
+            throw new UnsupportedSchemaChange(
+                "$name -> {$new->getName()}: YDB cannot rename a column (add the new one, copy the data, drop the old)."
+            );
+        }
+
+        $oldType = $this->getColumnTypeSQL($old);
+        $newType = $this->getColumnTypeSQL($new);
+        if ($oldType !== $newType) {
+            throw new UnsupportedSchemaChange("$name: YDB cannot change a column's type ($oldType -> $newType).");
+        }
+
+        if ($old->getNotnull() === $new->getNotnull()) {
+            return [];
+        }
+        if ($new->getNotnull()) {
+            throw new UnsupportedSchemaChange("$name: YDB cannot make an existing column NOT NULL.");
+        }
+
+        return [$alter . 'ALTER COLUMN ' . $old->getQuotedName($this) . ' DROP NOT NULL'];
+    }
+
+    private function getAddColumnDeclarationSQL(string $tableName, Column $column): string
+    {
+        $name = "$tableName.{$column->getName()}";
+        $declaration = $this->getColumnDeclarationSQL($column->getQuotedName($this), $column->toArray());
+
+        if ($column->getAutoincrement()) {
+            throw new UnsupportedSchemaChange("$name: YDB cannot add a serial column to an existing table.");
+        }
+        if (!$column->getNotnull()) {
+            return $declaration;
+        }
+        if (null === $column->getDefault()) {
+            throw new UnsupportedSchemaChange(
+                "$name: YDB cannot add a NOT NULL column without a DEFAULT. Make it nullable or give it a default."
+            );
+        }
+
+        return $declaration . ' DEFAULT ' . $this->getDefaultLiteral($name, $column);
+    }
+
+    /** The type part of the column's declaration, without NOT NULL: what actually decides a "type change". */
+    private function getColumnTypeSQL(Column $column): string
+    {
+        return $column->getType()->getSQLDeclaration($column->toArray(), $this);
+    }
+
+    /** DEFAULT is only needed (and only rendered) for NOT NULL columns being added; YQL wants a literal. */
+    private function getDefaultLiteral(string $name, Column $column): string
+    {
+        $default = $column->getDefault();
+        $yqlType = $this->getColumnTypeSQL($column);
+        $literal = match ($yqlType) {
+            YdbTypes::BOOL => match ($default) {
+                true, 1, '1', 'true' => 'true',
+                false, 0, '0', 'false' => 'false',
+                default => null,
+            },
+            YdbTypes::INT16, YdbTypes::INT32, YdbTypes::INT64 => is_int($default)
+                || (is_string($default) && 1 === preg_match('/^-?\d+$/', $default))
+                ? (string) $default
+                : null,
+            YdbTypes::DOUBLE => is_numeric($default) ? (string) (float) $default : null,
+            YdbTypes::UTF8, YdbTypes::STRING => is_string($default)
+                ? "'" . str_replace(['\\', "'", "\n", "\r", "\t"], ['\\\\', "\\'", '\n', '\r', '\t'], $default) . "'"
+                : null,
+            default => null,
+        };
+
+        return $literal ?? throw new UnsupportedSchemaChange(
+            "$name: cannot render the default " . var_export($default, true) . " as a YQL $yqlType literal."
+        );
     }
 
     /**

@@ -69,6 +69,22 @@ $connection->createSchemaManager()->createTable($table);
 
 `autoincrement` generates a `Serial`/`Bigserial`/`SmallSerial` column backed by YDB's own `Sequence` object - works the same way through the ORM's `#[GeneratedValue]`, as long as the identifier is a single column (YDB itself allows a composite `Serial` PK, but Doctrine ORM rejects `#[GeneratedValue]` on a composite identifier outright, regardless of platform).
 
+## Altering tables
+
+`SchemaManager::alterTable()` (and so the ORM's `SchemaTool::updateSchema()`) turns a schema diff into one `ALTER TABLE` per change. What YDB can do is supported; anything it can't do throws `Dudev\YdbDoctrine\Platform\UnsupportedSchemaChange` instead of silently doing nothing.
+
+| Change | Result |
+|---|---|
+| Add a nullable column | `ADD COLUMN` |
+| Add a `NOT NULL` column | `ADD COLUMN ... NOT NULL DEFAULT <literal>`; the column needs a `default` (int, bool, float, string), otherwise it throws. Needs a recent server: the 24.3 local image rejects `DEFAULT` in `ALTER`. |
+| Drop a column | `DROP COLUMN`; a primary key column throws. Its indexes are dropped first. |
+| `NOT NULL` -> nullable | `ALTER COLUMN ... DROP NOT NULL` (recent server). |
+| Nullable -> `NOT NULL`, change a type, rename a column, change the primary key, add a serial column | throws: YDB can't do it. |
+| Add / drop / rename an index | `ADD INDEX ... GLOBAL [UNIQUE SYNC]`, `DROP INDEX`, `RENAME INDEX`. Adding a *unique* index to an existing table was rejected by both server images tried (24.3 and a recent trunk build), so expect it to fail. |
+| Foreign keys, defaults, lengths, comments | ignored, as in `CREATE TABLE`: YDB has no foreign keys and the platform doesn't model the rest. |
+
+The schema manager reads secondary indexes back (`listTableIndexes()`), so a schema that was created from your mapping produces an empty diff.
+
 ## Custom DQL functions
 
 | Function              | Usage           |
@@ -131,6 +147,6 @@ Wire-type constants used internally to tag values for the SDK's binder (`Value\T
 
 ## Known limitations
 
-- No `ALTER TABLE` support - `YdbSchemaManager::alterTable()` silently does nothing (see `getAlterTableSQL()`). Only `CREATE TABLE`/`DROP TABLE` work; schema changes on an existing table need raw YQL today.
+- `ALTER TABLE` covers only what YDB itself can do, see "Altering tables" - no type changes, column renames, primary key changes or `SET NOT NULL`.
 - `Types::DECIMAL` writes lose precision (blocked on an open upstream SDK PR, see the table above) - reading and DDL are unaffected.
 - No `FOREIGN KEY`, `SAVEPOINT`, or transaction isolation level support - YDB doesn't have them.

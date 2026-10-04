@@ -124,7 +124,7 @@ class YdbStatement implements Statement
     {
         $sql = $this->getRawSql();
         try {
-            if (str_starts_with($sql, 'CREATE') || str_starts_with($sql, 'DROP')) {
+            if (str_starts_with($sql, 'CREATE') || str_starts_with($sql, 'DROP') || str_starts_with($sql, 'ALTER')) {
                 $this->session->schemeQuery($sql);
 
                 return new YdbSchemaResult();
