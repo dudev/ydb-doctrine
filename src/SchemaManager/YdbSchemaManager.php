@@ -12,7 +12,6 @@ use Doctrine\DBAL\Schema\Column;
 use Doctrine\DBAL\Schema\ForeignKeyConstraint;
 use Doctrine\DBAL\Schema\Index;
 use Doctrine\DBAL\Schema\Table;
-use Doctrine\DBAL\Schema\TableDiff;
 use Doctrine\DBAL\Schema\View;
 use Doctrine\DBAL\Types\Type;
 use YdbPlatform\Ydb\Exceptions\Grpc\UnimplementedException;
@@ -77,14 +76,18 @@ class YdbSchemaManager extends AbstractSchemaManager
     public function listTableIndexes(string $table): array
     {
         $data = $this->ydb->table()->session()->describeTable($table);
-        $columns = $data['primaryKey'];
+        $indexes = ['primary' => new Index('primary', $data['primaryKey'], true, true, [], [])];
 
-        return ['primary' => new Index('primary', $columns, true, true, [], [])];
-    }
+        // describeTable() marks the kind by key: globalIndex / globalUniqueIndex (empty arrays).
+        foreach ($data['indexes'] ?? [] as $index) {
+            $indexes[strtolower($index['name'])] = new Index(
+                $index['name'],
+                $index['indexColumns'],
+                isset($index['globalUniqueIndex']),
+            );
+        }
 
-    public function alterTable(TableDiff $tableDiff): void
-    {
-        // change
+        return $indexes;
     }
 
     public function listTableNames(): array

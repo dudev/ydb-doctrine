@@ -39,7 +39,8 @@ final class YdbTypes
     public const INTERVAL = 'interval';
 
     private const MAP_TO_DBAL_TYPES = [
-        self::STRING => Types::STRING,
+        // YDB String is bytes: BINARY declares back as `string`; Types::STRING would be `utf8`, a false diff.
+        self::STRING => Types::BINARY,
         self::UTF8 => Types::STRING,
         self::JSON => Types::JSON,
         self::DATETIME => Types::DATETIME_MUTABLE,
