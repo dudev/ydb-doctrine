@@ -76,12 +76,14 @@ $connection->createSchemaManager()->createTable($table);
 | Change | Result |
 |---|---|
 | Add a nullable column | `ADD COLUMN` |
-| Add a `NOT NULL` column | `ADD COLUMN ... NOT NULL DEFAULT <literal>`; the column needs a `default` (int, bool, float, string), otherwise it throws. Needs a recent server: the 24.3 local image rejects `DEFAULT` in `ALTER`. |
+| Add a `NOT NULL` column | `ADD COLUMN ... NOT NULL DEFAULT <literal>`; the column needs a `default` (int, bool, float, string), otherwise it throws. Needs the server's `enable_add_colums_with_defaults` feature flag (spelled that way in YDB), see below. |
 | Drop a column | `DROP COLUMN`; a primary key column throws. Its indexes are dropped first. |
-| `NOT NULL` -> nullable | `ALTER COLUMN ... DROP NOT NULL` (recent server). |
+| `NOT NULL` -> nullable | `ALTER COLUMN ... DROP NOT NULL` (not available on 24.x). |
 | Nullable -> `NOT NULL`, change a type, rename a column, change the primary key, add a serial column | throws: YDB can't do it. |
-| Add / drop / rename an index | `ADD INDEX ... GLOBAL [UNIQUE SYNC]`, `DROP INDEX`, `RENAME INDEX`. Adding a *unique* index to an existing table was rejected by both server images tried (24.3 and a recent trunk build), so expect it to fail. |
+| Add / drop / rename an index | `ADD INDEX ... GLOBAL [UNIQUE SYNC]`, `DROP INDEX`, `RENAME INDEX`. Adding a *unique* index to an existing table needs the `enable_add_unique_index` feature flag, see below. |
 | Foreign keys, defaults, lengths, comments | ignored, as in `CREATE TABLE`: YDB has no foreign keys and the platform doesn't model the rest. |
+
+Tested against `ydbplatform/local-ydb` 25.4, `latest` and `trunk`. On those images `ADD COLUMN ... NOT NULL DEFAULT` and adding a unique index to an existing table are off until the server is started with `--enable-feature-flag enable_add_colums_with_defaults` and `--enable-feature-flag enable_add_unique_index` (see `docker-compose.yml`); without them the server answers "... is disabled". On 24.x neither works and `DROP NOT NULL` is a syntax error.
 
 The schema manager reads secondary indexes back (`listTableIndexes()`), so a schema that was created from your mapping produces an empty diff.
 
