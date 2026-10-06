@@ -16,8 +16,20 @@ jobs:
             run: vendor/bin/phpstan analyse --no-progress --memory-limit=512M
           - name: PHPCS
             run: vendor/bin/phpcs
-          - name: PHPUnit
+          # The server is the other half of what is under test, so run it on every release line
+          # that has the ALTER TABLE features (24.x lacks DROP NOT NULL and the flags for the rest).
+          - name: PHPUnit (YDB 25.4)
             run: vendor/bin/phpunit
+            ydb-version: '25.4'
+          - name: PHPUnit (YDB latest)
+            run: vendor/bin/phpunit
+            ydb-version: latest
+          - name: PHPUnit (YDB trunk)
+            run: vendor/bin/phpunit
+            ydb-version: trunk
+    env:
+      # Which ydbplatform/local-ydb tag docker-compose.yml starts; empty falls back to `latest`.
+      YDB_VERSION: ${{ matrix.ydb-version }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4

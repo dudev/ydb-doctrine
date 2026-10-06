@@ -1,27 +1,17 @@
 services:
   db:
-    image: cr.yandex/yc/yandex-docker-local-ydb:latest
-    environment:
-      YDB_USE_IN_MEMORY_PDISKS: 'true'
-      YDB_LOCAL_SURVIVE_RESTART: 'true'
-      YDB_GRPC_ENABLE_TLS: 'true'
-      GRPC_TLS_PORT: '2135'
-      GRPC_PORT: '2136'
-      YDB_GRPC_TLS_DATA_PATH: /ydb_certs
+    # Same image the other YDB SDKs test against; its numbered tags track real releases
+    # (the cr.yandex/yc/yandex-docker-local-ydb `latest` is a stale 24.3 build).
+    # YDB_VERSION picks the tag (25.4, latest, trunk, ...), CI runs a matrix over it.
+    image: ydbplatform/local-ydb:${YDB_VERSION:-latest}
     ports:
-      - 8765:8765
-      - 2136:2136
-      - 48066:48066
-    # Same as the image's own /initialize_local_ydb entrypoint script, with
-    # --enable-feature-flag enable_views added - views are compiled in but off
-    # by default on this image, and there's no config-file mount point to flip
-    # it another way.
-    command: >
-      sh -c "
-        /local_ydb deploy --ydb-working-dir /ydb_data --ydb-binary-path /ydbd --fixed-ports --dont-use-log-files --enable-feature-flag enable_views;
-        if [ -f /init_ydb ]; then sh /init_ydb; fi;
-        tail -f /dev/null
-      "
+      - ${YDB_MON_PORT:-8765}:8765
+      - ${YDB_GRPC_PORT:-2136}:2136
+    # Flags that are off by default on the 25.x servers and that the tests need: views, ADD COLUMN
+    # ... NOT NULL DEFAULT (sic: the flag really is spelled "colums") and unique indexes on an existing
+    # table. `local_ydb deploy` takes them. The entrypoint is spelled out because 24.x images have none.
+    entrypoint: ["bash", "/initialize_local_ydb"]
+    command: ["--enable-feature-flag", "enable_views", "--enable-feature-flag", "enable_add_colums_with_defaults", "--enable-feature-flag", "enable_add_unique_index"]
 
   php:
     # Explicit tag so CI can build it with buildx (GHA cache) and reuse it here without a rebuild.

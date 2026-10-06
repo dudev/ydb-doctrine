@@ -10,10 +10,7 @@ use Dudev\YdbDoctrine\Tests\App\Entity\Post;
 use Dudev\YdbDoctrine\Tests\App\Entity\Profile;
 use Dudev\YdbDoctrine\Tests\App\Entity\User;
 
-/**
- * Only what every YDB version accepts runs here (CI uses the 24.3 image): DROP NOT NULL and NOT NULL ... DEFAULT
- * need a newer server, their SQL is covered by the unit test and was checked by hand against the trunk image.
- */
+/** Needs YDB 25.4 or newer, started with the feature flags from docker-compose.yml (24.x has no DROP NOT NULL). */
 class AlterTableTestCase extends AbstractFunctionalCase
 {
     private const TABLE = 'tmp_alter';
@@ -122,6 +119,49 @@ class AlterTableTestCase extends AbstractFunctionalCase
         $wanted->dropIndex('idx_a_new');
         $this->migrateTo($wanted);
         $this->assertSame(['idx_b', 'primary'], $this->indexNames());
+    }
+
+    public function testAddNotNullColumnWithDefaultFillsExistingRows(): void
+    {
+        $this->createBaseTable();
+        $this->connection->executeStatement('INSERT INTO ' . self::TABLE . " (a) VALUES ('x')");
+        $wanted = $this->introspect();
+        $wanted->addColumn('n', Types::INTEGER, ['default' => 5]);
+        $wanted->addColumn('flag', Types::BOOLEAN, ['default' => false]);
+        $wanted->addColumn('ratio', Types::FLOAT, ['default' => 1.5]);
+        $wanted->addColumn('label', Types::STRING, ['default' => "it's"]);
+
+        $this->migrateTo($wanted);
+
+        $row = $this->connection->fetchAssociative('SELECT n, flag, ratio, label FROM ' . self::TABLE);
+        $this->assertIsArray($row);
+        $this->assertEquals(5, $row['n']);
+        $this->assertEquals(false, $row['flag']);
+        $this->assertEquals(1.5, $row['ratio']);
+        $this->assertSame("it's", $row['label']);
+        $this->assertTrue($this->connection->createSchemaManager()->createComparator()->compareTables($this->introspect(), $wanted)->isEmpty());
+    }
+
+    public function testDropNotNull(): void
+    {
+        $this->createBaseTable();
+        $wanted = $this->introspect();
+        $wanted->getColumn('a')->setNotnull(false);
+
+        $this->migrateTo($wanted);
+
+        $this->assertFalse($this->introspect()->getColumn('a')->getNotnull());
+    }
+
+    public function testAddUniqueIndexToAnExistingTable(): void
+    {
+        $this->createBaseTable();
+        $wanted = $this->introspect();
+        $wanted->addUniqueIndex(['a'], 'uniq_a');
+
+        $this->migrateTo($wanted);
+
+        $this->assertTrue($this->introspect()->getIndex('uniq_a')->isUnique());
     }
 
     public function testAppliedDiffLeavesNothingToDo(): void
