@@ -2,6 +2,7 @@
 
 namespace Dudev\YdbDoctrine;
 
+use Dudev\YdbDoctrine\Platform\FeatureDisabledOnServer;
 use Dudev\YdbDoctrine\Value\TypedValue as YdbBoundValue;
 use Doctrine\DBAL\Driver\Result;
 use Doctrine\DBAL\Driver\Statement;
@@ -163,7 +164,8 @@ class YdbStatement implements Statement
         } catch (\Throwable $ex) {
             $this->clearDeadTransaction();
 
-            throw new \Exception($sql . "\n" . ' Details: ' . $ex->getMessage(), previous: $ex);
+            throw FeatureDisabledOnServer::tryFrom($sql, $ex)
+                ?? new \Exception($sql . "\n" . ' Details: ' . $ex->getMessage(), previous: $ex);
         }
     }
 

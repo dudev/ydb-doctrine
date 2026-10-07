@@ -3,6 +3,7 @@
 namespace Dudev\YdbDoctrine;
 
 use Dudev\YdbDoctrine\Platform\Keywords;
+use Dudev\YdbDoctrine\Platform\ServerVersion;
 use Dudev\YdbDoctrine\Platform\UnsupportedSchemaChange;
 use Dudev\YdbDoctrine\SchemaManager\YdbSchemaManager;
 use Doctrine\DBAL\Connection;
@@ -15,15 +16,50 @@ use Doctrine\DBAL\Schema\Index;
 use Doctrine\DBAL\Schema\Name\UnquotedIdentifierFolding;
 use Doctrine\DBAL\Schema\Table;
 use Doctrine\DBAL\Schema\TableDiff;
+use Doctrine\DBAL\ServerVersionProvider;
 use Doctrine\DBAL\TransactionIsolationLevel;
 use YdbPlatform\Ydb\Ydb;
 
 final class YdbPlatform extends AbstractPlatform
 {
-    public function __construct()
+    /** First release line with DROP NOT NULL; NOT NULL DEFAULT and a unique index on an existing table need it too (and a feature flag). */
+    private const ALTER_FEATURES_SINCE = [25, 1];
+
+    private ?ServerVersion $serverVersion = null;
+
+    private bool $serverVersionAsked = false;
+
+    /** The provider is only asked when a statement depends on the version, never on construction (it costs a query). */
+    public function __construct(private readonly ?ServerVersionProvider $versionProvider = null)
     {
         // YQL identifiers are case-sensitive: folding to upper case turned `idx_b` into `IDX_B` in RENAME INDEX.
         parent::__construct(UnquotedIdentifierFolding::NONE);
+    }
+
+    /** Null when unknown (no provider, the server doesn't answer, an unrecognised format): nothing is refused up front then. */
+    private function serverVersion(): ?ServerVersion
+    {
+        if (!$this->serverVersionAsked) {
+            $this->serverVersionAsked = true;
+            try {
+                $this->serverVersion = null === $this->versionProvider
+                    ? null
+                    : ServerVersion::tryParse($this->versionProvider->getServerVersion());
+            } catch (\Throwable) {
+                $this->serverVersion = null;
+            }
+        }
+
+        return $this->serverVersion;
+    }
+
+    private function requireAlterFeatures(string $what): void
+    {
+        [$major, $minor] = self::ALTER_FEATURES_SINCE;
+        $version = $this->serverVersion();
+        if (null !== $version && !$version->isAtLeast($major, $minor)) {
+            throw new UnsupportedSchemaChange("$what needs YDB $major.$minor or newer, this server is $version->raw.");
+        }
     }
 
     /**
@@ -122,6 +158,11 @@ final class YdbPlatform extends AbstractPlatform
             $sql[] = $alter . 'ADD COLUMN ' . $this->getAddColumnDeclarationSQL($table->getName(), $column);
         }
         foreach ($diff->getAddedIndexes() as $index) {
+            if ($index->isUnique()) {
+                $this->requireAlterFeatures(
+                    "{$table->getName()}.{$index->getName()}: adding a unique index to an existing table"
+                );
+            }
             $sql[] = $alter . 'ADD ' . $this->getIndexDeclarationSQL($index);
         }
 
@@ -154,6 +195,8 @@ final class YdbPlatform extends AbstractPlatform
             throw new UnsupportedSchemaChange("$name: YDB cannot make an existing column NOT NULL.");
         }
 
+        $this->requireAlterFeatures("$name: DROP NOT NULL");
+
         return [$alter . 'ALTER COLUMN ' . $old->getQuotedName($this) . ' DROP NOT NULL'];
     }
 
@@ -173,6 +216,8 @@ final class YdbPlatform extends AbstractPlatform
                 "$name: YDB cannot add a NOT NULL column without a DEFAULT. Make it nullable or give it a default."
             );
         }
+
+        $this->requireAlterFeatures("$name: adding a NOT NULL column with a DEFAULT");
 
         return $declaration . ' DEFAULT ' . $this->getDefaultLiteral($name, $column);
     }

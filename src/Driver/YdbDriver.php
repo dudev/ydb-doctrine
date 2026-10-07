@@ -130,7 +130,7 @@ class YdbDriver implements Driver
 
     public function getDatabasePlatform(ServerVersionProvider $versionProvider): AbstractPlatform
     {
-        return new YdbPlatform();
+        return new YdbPlatform($versionProvider);
     }
 
     public function getExceptionConverter(): ExceptionConverter

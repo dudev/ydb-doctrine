@@ -28,6 +28,8 @@ final class YdbConnection implements Connection
 
     private int|string|null $lastInsertId = null;
 
+    private ?string $serverVersion = null;
+
     public function __construct(
         private Ydb $ydb
     ) {
@@ -64,9 +66,10 @@ final class YdbConnection implements Connection
         return $this->ydb;
     }
 
+    /** The server's own version (what `SELECT version()` says), asked once per connection; DBAL's `serverVersion` param skips this. */
     public function getServerVersion(): string
     {
-        return Ydb::VERSION;
+        return $this->serverVersion ??= (string) $this->query('SELECT version() AS v')->fetchOne();
     }
 
     public function prepare(string $sql): Statement

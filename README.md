@@ -83,7 +83,22 @@ $connection->createSchemaManager()->createTable($table);
 | Add / drop / rename an index | `ADD INDEX ... GLOBAL [UNIQUE SYNC]`, `DROP INDEX`, `RENAME INDEX`. Adding a *unique* index to an existing table needs the `enable_add_unique_index` feature flag, see below. |
 | Foreign keys, defaults, lengths, comments | ignored, as in `CREATE TABLE`: YDB has no foreign keys and the platform doesn't model the rest. |
 
-Tested against `ydbplatform/local-ydb` 25.4, `latest` and `trunk`. On those images `ADD COLUMN ... NOT NULL DEFAULT` and adding a unique index to an existing table are off until the server is started with `--enable-feature-flag enable_add_colums_with_defaults` and `--enable-feature-flag enable_add_unique_index` (see `docker-compose.yml`); without them the server answers "... is disabled". On 24.x neither works and `DROP NOT NULL` is a syntax error.
+Tested against `ydbplatform/local-ydb` 25.4, 26.3.1.17 (the managed service's build), `latest` and `trunk`.
+
+### Server version and feature flags
+
+`DROP NOT NULL`, `ADD COLUMN ... NOT NULL DEFAULT` and adding a unique index to an existing table need YDB 25.1 or newer. The platform asks the server (`SELECT version()`, once per connection, and only when a diff contains one of these changes) and throws `UnsupportedSchemaChange` ("... needs YDB 25.1 or newer, this server is 24.4.4.12") instead of sending SQL that fails with a syntax error. If the version can't be read or recognised, nothing is refused up front and the server has the last word.
+
+To skip the query, or to override the answer, pass DBAL's own `serverVersion` parameter (`server_version` in DoctrineBundle), e.g. `25.4` or `stable-26-3-1-17`.
+
+Two of these are also behind server feature flags, which a client can't read. If a flag is off, the error says which one to turn on (`FeatureDisabledOnServer`, a `RuntimeException`):
+
+| Change | Flag | Default |
+|---|---|---|
+| `ADD COLUMN ... NOT NULL DEFAULT` | `enable_add_colums_with_defaults` (spelled that way in YDB) | off on 25.4, on from 26.3 |
+| Unique index on an existing table | `enable_add_unique_index` | off on 25.4 and on 26.3.1.17 |
+
+`docker-compose.yml` turns both on for the tests.
 
 The schema manager reads secondary indexes back (`listTableIndexes()`), so a schema that was created from your mapping produces an empty diff.
 
