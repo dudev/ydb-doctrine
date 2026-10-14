@@ -74,6 +74,23 @@ class YdbPlatformAlterTableTest extends TestCase
         yield 'bool true as string' => [Types::BOOLEAN, ['default' => '1'], '`c` bool NOT NULL DEFAULT true'];
         yield 'float' => [Types::FLOAT, ['default' => 1.5], '`c` double NOT NULL DEFAULT 1.5'];
         yield 'string' => [Types::STRING, ['default' => 'x'], "`c` utf8 NOT NULL DEFAULT 'x'"];
+        yield 'single precision float needs a Float literal' => [
+            Types::SMALLFLOAT,
+            ['default' => 1.5],
+            "`c` float NOT NULL DEFAULT Float('1.5')",
+        ];
+        yield 'json' => [Types::JSON, ['default' => '[]'], "`c` json NOT NULL DEFAULT Json('[]')"];
+        yield 'date' => [Types::DATE_MUTABLE, ['default' => '2020-01-02'], "`c` date NOT NULL DEFAULT Date('2020-01-02')"];
+        yield 'datetime' => [
+            Types::DATETIME_MUTABLE,
+            ['default' => '2020-01-02 03:04:05'],
+            "`c` datetime NOT NULL DEFAULT Datetime('2020-01-02T03:04:05Z')",
+        ];
+        yield 'uuid' => [
+            Types::GUID,
+            ['default' => '6F9619FF-8B86-D011-B42D-00C04FC964FF'],
+            "`c` uuid NOT NULL DEFAULT Uuid('6F9619FF-8B86-D011-B42D-00C04FC964FF')",
+        ];
         yield 'string with quote and backslash' => [
             Types::STRING,
             ['default' => "it's a\\b\n"],
@@ -113,12 +130,22 @@ class YdbPlatformAlterTableTest extends TestCase
         $this->alter($this->oldTable(), $new);
     }
 
-    public function testDefaultIsNotRenderedForANullableColumn(): void
+    public function testDefaultIsRenderedForANullableColumnToo(): void
     {
         $new = $this->oldTable();
         $new->addColumn('c', Types::INTEGER, ['notnull' => false, 'default' => 7]);
 
-        $this->assertSame(['ALTER TABLE `t` ADD COLUMN `c` int32'], $this->alter($this->oldTable(), $new));
+        $this->assertSame(['ALTER TABLE `t` ADD COLUMN `c` int32 DEFAULT 7'], $this->alter($this->oldTable(), $new));
+    }
+
+    public function testChangingOnlyTheDefaultIsNotADiff(): void
+    {
+        $old = $this->oldTable();
+        $old->addColumn('c', Types::INTEGER, ['default' => 1]);
+        $new = $this->oldTable();
+        $new->addColumn('c', Types::INTEGER, ['default' => 2]);
+
+        $this->assertSame([], $this->alter($old, $new));
     }
 
     public function testDropColumn(): void

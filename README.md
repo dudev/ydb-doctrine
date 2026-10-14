@@ -69,6 +69,24 @@ $connection->createSchemaManager()->createTable($table);
 
 `autoincrement` generates a `Serial`/`Bigserial`/`SmallSerial` column backed by YDB's own `Sequence` object - works the same way through the ORM's `#[GeneratedValue]`, as long as the identifier is a single column (YDB itself allows a composite `Serial` PK, but Doctrine ORM rejects `#[GeneratedValue]` on a composite identifier outright, regardless of platform).
 
+### Column defaults
+
+A column's `default` is written into `CREATE TABLE` (and `ADD COLUMN`) after `NOT NULL`, as YQL requires. YQL wants a literal of the column's own type, so these are rendered:
+
+| `Types::*` | `default` | Rendered as |
+|---|---|---|
+| `BOOLEAN` | `true`, `false`, `1`, `0`, `'1'`, `'0'`, `'true'`, `'false'` | `true` / `false` |
+| `SMALLINT`, `INTEGER`, `BIGINT` | an integer, or a numeric string | `5` |
+| `FLOAT` | a number | `1.5` |
+| `SMALLFLOAT` | a number | `Float('1.5')` |
+| `STRING`, `TEXT`, `BINARY` | a string | `'it\'s'` |
+| `JSON` | a JSON string | `Json('[]')` |
+| `DATE_MUTABLE` | `'2020-01-02'` | `Date('2020-01-02')` |
+| `DATETIME_MUTABLE` | `'2020-01-02 03:04:05'` (read as UTC) | `Datetime('2020-01-02T03:04:05Z')` |
+| `GUID` | a UUID string | `Uuid('...')` |
+
+Anything else, including functions such as `CURRENT_TIMESTAMP` (YDB refuses them in a default), throws `UnsupportedSchemaChange` instead of being silently dropped. A `default` on an `autoincrement` column is ignored. The schema manager can't read a default back, so a default is never a difference between the mapping and the database, and changing one is not a migration.
+
 ## Altering tables
 
 `SchemaManager::alterTable()` (and so the ORM's `SchemaTool::updateSchema()`) turns a schema diff into one `ALTER TABLE` per change. What YDB can do is supported; anything it can't do throws `Dudev\YdbDoctrine\Platform\UnsupportedSchemaChange` instead of silently doing nothing.
@@ -76,18 +94,18 @@ $connection->createSchemaManager()->createTable($table);
 | Change | Result |
 |---|---|
 | Add a nullable column | `ADD COLUMN` |
-| Add a `NOT NULL` column | `ADD COLUMN ... NOT NULL DEFAULT <literal>`; the column needs a `default` (int, bool, float, string), otherwise it throws. Needs the server's `enable_add_colums_with_defaults` feature flag (spelled that way in YDB), see below. |
+| Add a `NOT NULL` column | `ADD COLUMN ... NOT NULL DEFAULT <literal>`; the column needs a `default` (see above), otherwise it throws. Needs the server's `enable_add_colums_with_defaults` feature flag (spelled that way in YDB), see below. |
 | Drop a column | `DROP COLUMN`; a primary key column throws. Its indexes are dropped first. |
 | `NOT NULL` -> nullable | `ALTER COLUMN ... DROP NOT NULL` (not available on 24.x). |
 | Nullable -> `NOT NULL`, change a type, rename a column, change the primary key, add a serial column | throws: YDB can't do it. |
 | Add / drop / rename an index | `ADD INDEX ... GLOBAL [UNIQUE SYNC]`, `DROP INDEX`, `RENAME INDEX`. Adding a *unique* index to an existing table needs the `enable_add_unique_index` feature flag, see below. |
-| Foreign keys, defaults, lengths, comments | ignored, as in `CREATE TABLE`: YDB has no foreign keys and the platform doesn't model the rest. |
+| Foreign keys, lengths, comments, a changed default | ignored, as in `CREATE TABLE`: YDB has no foreign keys and the platform doesn't model the rest. |
 
 Tested against `ydbplatform/local-ydb` 25.4, 26.3.1.17 (the managed service's build), `latest` and `trunk`.
 
 ### Server version and feature flags
 
-`DROP NOT NULL`, `ADD COLUMN ... NOT NULL DEFAULT` and adding a unique index to an existing table need YDB 25.1 or newer. The platform asks the server (`SELECT version()`, once per connection, and only when a diff contains one of these changes) and throws `UnsupportedSchemaChange` ("... needs YDB 25.1 or newer, this server is 24.4.4.12") instead of sending SQL that fails with a syntax error. If the version can't be read or recognised, nothing is refused up front and the server has the last word.
+`DROP NOT NULL`, `ADD COLUMN` with a `DEFAULT` and adding a unique index to an existing table need YDB 25.1 or newer (`CREATE TABLE` with a default works on 24.x too). The platform asks the server (`SELECT version()`, once per connection, and only when a diff contains one of these changes) and throws `UnsupportedSchemaChange` ("... needs YDB 25.1 or newer, this server is 24.4.4.12") instead of sending SQL that fails with a syntax error. If the version can't be read or recognised, nothing is refused up front and the server has the last word.
 
 To skip the query, or to override the answer, pass DBAL's own `serverVersion` parameter (`server_version` in DoctrineBundle), e.g. `25.4` or `stable-26-3-1-17`.
 

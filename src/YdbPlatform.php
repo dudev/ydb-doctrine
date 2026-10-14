@@ -203,23 +203,55 @@ final class YdbPlatform extends AbstractPlatform
     private function getAddColumnDeclarationSQL(string $tableName, Column $column): string
     {
         $name = "$tableName.{$column->getName()}";
-        $declaration = $this->getColumnDeclarationSQL($column->getQuotedName($this), $column->toArray());
 
         if ($column->getAutoincrement()) {
             throw new UnsupportedSchemaChange("$name: YDB cannot add a serial column to an existing table.");
         }
-        if (!$column->getNotnull()) {
-            return $declaration;
-        }
         if (null === $column->getDefault()) {
-            throw new UnsupportedSchemaChange(
-                "$name: YDB cannot add a NOT NULL column without a DEFAULT. Make it nullable or give it a default."
+            if ($column->getNotnull()) {
+                throw new UnsupportedSchemaChange(
+                    "$name: YDB cannot add a NOT NULL column without a DEFAULT. Make it nullable or give it a default."
+                );
+            }
+        } else {
+            $this->requireAlterFeatures(
+                "$name: adding a " . ($column->getNotnull() ? 'NOT NULL ' : '') . 'column with a DEFAULT'
             );
         }
 
-        $this->requireAlterFeatures("$name: adding a NOT NULL column with a DEFAULT");
+        return $this->getColumnDeclarationSQL($column->getQuotedName($this), $column->toArray());
+    }
 
-        return $declaration . ' DEFAULT ' . $this->getDefaultLiteral($name, $column);
+    /**
+     * DBAL puts DEFAULT before NOT NULL, YQL only parses it after ("Missing IS keyword before NOT NULL"),
+     * so it is appended here instead of through getDefaultValueDeclarationSQL().
+     *
+     * @param array{
+     *     name: string,
+     *     default?: mixed,
+     *     autoincrement?: bool,
+     *     columnDefinition?: non-empty-string|null,
+     *     ...
+     * } $column
+     */
+    public function getColumnDeclarationSQL(string $name, array $column): string
+    {
+        $declaration = parent::getColumnDeclarationSQL($name, $column);
+
+        if (isset($column['columnDefinition']) || !isset($column['default']) || ($column['autoincrement'] ?? false)) {
+            return $declaration;
+        }
+
+        return $declaration . ' DEFAULT ' . $this->getDefaultLiteral($column);
+    }
+
+    /**
+     * Introspection can't read a DEFAULT back, and the declaration now includes it: without this every
+     * column with a default would show up in every diff.
+     */
+    public function columnsEqual(Column $column1, Column $column2): bool
+    {
+        return parent::columnsEqual((clone $column1)->setDefault(null), (clone $column2)->setDefault(null));
     }
 
     /** The type part of the column's declaration, without NOT NULL: what actually decides a "type change". */
@@ -228,11 +260,16 @@ final class YdbPlatform extends AbstractPlatform
         return $column->getType()->getSQLDeclaration($column->toArray(), $this);
     }
 
-    /** DEFAULT is only needed (and only rendered) for NOT NULL columns being added; YQL wants a literal. */
-    private function getDefaultLiteral(string $name, Column $column): string
+    /**
+     * YQL wants a literal of the column's own type (a plain 1.5 is a Double, not a Float; functions such as
+     * CurrentUtcDatetime() are refused), and anything that can't be written as one throws instead of being dropped.
+     *
+     * @param array<string, mixed> $column
+     */
+    private function getDefaultLiteral(array $column): string
     {
-        $default = $column->getDefault();
-        $yqlType = $this->getColumnTypeSQL($column);
+        $default = $column['default'];
+        $yqlType = $this->getColumnType($column)->getSQLDeclaration($column, $this);
         $literal = match ($yqlType) {
             YdbTypes::BOOL => match ($default) {
                 true, 1, '1', 'true' => 'true',
@@ -244,15 +281,33 @@ final class YdbPlatform extends AbstractPlatform
                 ? (string) $default
                 : null,
             YdbTypes::DOUBLE => is_numeric($default) ? (string) (float) $default : null,
-            YdbTypes::UTF8, YdbTypes::STRING => is_string($default)
-                ? "'" . str_replace(['\\', "'", "\n", "\r", "\t"], ['\\\\', "\\'", '\n', '\r', '\t'], $default) . "'"
+            YdbTypes::FLOAT => is_numeric($default) ? "Float('" . (float) $default . "')" : null,
+            YdbTypes::UTF8, YdbTypes::STRING => is_string($default) ? $this->quoteYqlString($default) : null,
+            YdbTypes::JSON => is_string($default) ? 'Json(' . $this->quoteYqlString($default) . ')' : null,
+            YdbTypes::DATE => is_string($default) && 1 === preg_match('/^\d{4}-\d{2}-\d{2}$/', $default)
+                ? "Date('$default')"
+                : null,
+            YdbTypes::DATETIME => is_string($default)
+                && 1 === preg_match('/^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2}:\d{2})$/', $default, $parts)
+                ? "Datetime('{$parts[1]}T{$parts[2]}Z')"
+                : null,
+            YdbTypes::UUID => is_string($default)
+                && 1 === preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $default)
+                ? "Uuid('$default')"
                 : null,
             default => null,
         };
 
         return $literal ?? throw new UnsupportedSchemaChange(
-            "$name: cannot render the default " . var_export($default, true) . " as a YQL $yqlType literal."
+            "{$column['name']}: cannot render the default " . var_export($default, true) . " as a YQL $yqlType literal."
         );
+    }
+
+    private function quoteYqlString(string $value): string
+    {
+        $escaped = str_replace(['\\', "'", "\n", "\r", "\t"], ['\\\\', "\\'", '\n', '\r', '\t'], $value);
+
+        return "'" . $escaped . "'";
     }
 
     /**
@@ -348,9 +403,7 @@ final class YdbPlatform extends AbstractPlatform
         return $item;
     }
 
-    /**
-     * Нет DEFAULT.
-     */
+    /** Left empty on purpose: DEFAULT has to follow NOT NULL, see getColumnDeclarationSQL(). */
     public function getDefaultValueDeclarationSQL(array $column): string
     {
         return '';
